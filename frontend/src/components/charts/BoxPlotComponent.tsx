@@ -44,7 +44,7 @@ interface TransformedBoxEntry {
   whiskerLow: number[];  // [below q1, above q3]
 }
 
-const CustomTooltip: React.FC<TooltipProps<number, string>> = ({ active, payload }) => {
+const CustomTooltip: React.FC<TooltipProps<any, any>> = ({ active, payload }) => {
   if (!active || !payload || !payload.length) return null;
   const d = payload[0]?.payload as TransformedBoxEntry | undefined;
   if (!d) return null;

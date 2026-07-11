@@ -23,7 +23,7 @@ interface ScatterComponentProps {
   height?: number;
 }
 
-const CustomTooltip: React.FC<TooltipProps<number, string>> = ({ active, payload }) => {
+const CustomTooltip: React.FC<TooltipProps<any, any>> = ({ active, payload }) => {
   if (active && payload && payload.length) {
     const point = payload[0]?.payload as ScatterDataPoint | undefined;
     return (

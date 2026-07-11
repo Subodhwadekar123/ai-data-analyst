@@ -18,7 +18,7 @@ interface HistogramComponentProps {
   height?: number;
 }
 
-const CustomTooltip: React.FC<TooltipProps<number, string>> = ({ active, payload, label }) => {
+const CustomTooltip: React.FC<TooltipProps<any, any>> = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
       <div

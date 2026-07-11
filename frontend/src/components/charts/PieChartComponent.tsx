@@ -25,7 +25,7 @@ const COLORS = [
   '#ef4444',
 ];
 
-const CustomTooltip: React.FC<TooltipProps<number, string>> = ({ active, payload }) => {
+const CustomTooltip: React.FC<TooltipProps<any, any>> = ({ active, payload }) => {
   if (active && payload && payload.length) {
     const item = payload[0];
     const total = (item.payload as { total?: number })?.total;

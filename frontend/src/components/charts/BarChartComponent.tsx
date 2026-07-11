@@ -23,7 +23,7 @@ interface CustomTooltipPayload {
   value: number;
 }
 
-const CustomTooltip: React.FC<TooltipProps<number, string>> = ({ active, payload, label }) => {
+const CustomTooltip: React.FC<TooltipProps<any, any>> = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     const item = payload[0] as { payload: CustomTooltipPayload; value: number };
     return (
