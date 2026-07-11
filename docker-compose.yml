@@ -1,0 +1,53 @@
+# AI Data Analyst - Docker Compose
+# =====================================
+# Starts both frontend and backend with a single command
+
+version: '3.9'
+
+services:
+  # ── Backend (FastAPI) ─────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ai_data_analyst_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=false
+      - ENVIRONMENT=production
+      - DATABASE_URL=sqlite:///./ai_data_analyst.db
+      - UPLOAD_DIR=/app/uploads
+      - REPORTS_DIR=/app/reports
+      - MAX_FILE_SIZE_MB=200
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - SECRET_KEY=${SECRET_KEY:-changeme-in-production}
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/reports:/app/reports
+      - backend_db:/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ── Frontend (React + Nginx) ──────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ai_data_analyst_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      - VITE_API_URL=http://backend:8000
+
+volumes:
+  backend_db:
