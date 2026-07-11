@@ -20,7 +20,8 @@ COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir psycopg2-binary bcrypt
 
 # Copy application code
 COPY . .
