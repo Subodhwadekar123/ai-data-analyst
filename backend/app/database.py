@@ -13,9 +13,12 @@ from typing import Generator
 from app.config import settings
 
 # ── Engine & Session ─────────────────────────────────────────────────────────
+# Only use SQLite-specific args if connecting to an SQLite database
+connect_args = {"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {}
+
 engine = create_engine(
     settings.DATABASE_URL,
-    connect_args={"check_same_thread": False},  # Required for SQLite
+    connect_args=connect_args,
     echo=settings.DEBUG,
 )
 
