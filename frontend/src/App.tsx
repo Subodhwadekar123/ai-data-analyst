@@ -5,9 +5,10 @@
 
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from './store/useStore';
 import { healthCheck } from './services/api';
+import SplashScreen from './components/ui/SplashScreen';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -27,10 +28,24 @@ import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
 
 function App() {
+  const [showSplash, setShowSplash] = useState(true);
+
   // Pre-warm the backend server (Render free tier goes to sleep after inactivity)
+  // and handle the 10s interactive splash screen
   useEffect(() => {
     healthCheck().catch(() => {});
+    
+    // Hide splash screen after 10 seconds
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+    }, 10000);
+
+    return () => clearTimeout(timer);
   }, []);
+
+  if (showSplash) {
+    return <SplashScreen />;
+  }
 
   return (
     <HashRouter>
