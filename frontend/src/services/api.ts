@@ -185,17 +185,32 @@ export const getAdminIssues = () => api.get('/admin/issues') as Promise<any>;
 export const deleteIssue = (issueId: number) => api.delete(`/admin/issues/${issueId}`) as Promise<any>;
 export const toggleUserAccess = (userId: string) => api.put(`/admin/users/${userId}/toggle-access`) as Promise<any>;
 export const getUserDatasets = (userId: string) => api.get(`/admin/users/${userId}/datasets`) as Promise<any>;
-export const adminDownloadPDF = (datasetId: string) => {
-  const base = import.meta.env.VITE_API_URL || '/api/v1';
-  return `${base}/admin/reports/${datasetId}/pdf`;
+// ── File Downloads ─────────────────────────────────────────────────────────
+
+const triggerBlobDownload = (data: Blob, filename: string) => {
+  const url = window.URL.createObjectURL(data);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
 };
-export const adminDownloadExcel = (datasetId: string) => {
-  const base = import.meta.env.VITE_API_URL || '/api/v1';
-  return `${base}/admin/reports/${datasetId}/excel`;
+
+export const adminDownloadPDF = async (datasetId: string) => {
+  const response = await api.get(`/admin/reports/${datasetId}/pdf`, { responseType: 'blob' });
+  triggerBlobDownload(response as unknown as Blob, `admin_report_${datasetId}.pdf`);
 };
-export const adminDownloadCSV = (datasetId: string) => {
-  const base = import.meta.env.VITE_API_URL || '/api/v1';
-  return `${base}/cleaning/${datasetId}/export?format=csv`;
+
+export const adminDownloadExcel = async (datasetId: string) => {
+  const response = await api.get(`/admin/reports/${datasetId}/excel`, { responseType: 'blob' });
+  triggerBlobDownload(response as unknown as Blob, `admin_report_${datasetId}.xlsx`);
+};
+
+export const adminDownloadCSV = async (datasetId: string) => {
+  const response = await api.get(`/cleaning/${datasetId}/export?format=csv`, { responseType: 'blob' });
+  triggerBlobDownload(response as unknown as Blob, `dataset_${datasetId}.csv`);
 };
 
 export default api;

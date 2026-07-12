@@ -111,6 +111,21 @@ const AdminPage: React.FC = () => {
     }
   };
 
+  // Download Handlers
+  const handleDownload = async (type: 'csv' | 'pdf' | 'excel', id: string) => {
+    const downloadPromise = async () => {
+      if (type === 'csv') await adminDownloadCSV(id);
+      if (type === 'pdf') await adminDownloadPDF(id);
+      if (type === 'excel') await adminDownloadExcel(id);
+    };
+
+    toast.promise(downloadPromise(), {
+      loading: `Downloading ${type.toUpperCase()}...`,
+      success: `Downloaded ${type.toUpperCase()} successfully!`,
+      error: `Failed to download ${type.toUpperCase()}`
+    });
+  };
+
   // Expand user row to show their datasets
   const handleViewUserDatasets = async (userId: string) => {
     if (expandedUserId === userId) {
@@ -438,10 +453,8 @@ const AdminPage: React.FC = () => {
                                             <td style={{ padding: '10px 8px', color: '#64748b' }}>{formatDateTime(ds.created_at)}</td>
                                             <td style={{ padding: '10px 8px', textAlign: 'center' }}>
                                               <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                                                <a
-                                                  href={adminDownloadPDF(ds.id)}
-                                                  target="_blank"
-                                                  rel="noopener noreferrer"
+                                                <button
+                                                  onClick={() => handleDownload('pdf', ds.id)}
                                                   style={{
                                                     display: 'inline-flex',
                                                     alignItems: 'center',
@@ -453,16 +466,14 @@ const AdminPage: React.FC = () => {
                                                     fontSize: '11px',
                                                     fontWeight: 600,
                                                     border: '1px solid rgba(239,68,68,0.2)',
-                                                    textDecoration: 'none',
+                                                    cursor: 'pointer',
                                                     transition: 'all 0.2s'
                                                   }}
                                                 >
                                                   <Download size={11} /> PDF
-                                                </a>
-                                                <a
-                                                  href={adminDownloadExcel(ds.id)}
-                                                  target="_blank"
-                                                  rel="noopener noreferrer"
+                                                </button>
+                                                <button
+                                                  onClick={() => handleDownload('excel', ds.id)}
                                                   style={{
                                                     display: 'inline-flex',
                                                     alignItems: 'center',
@@ -474,12 +485,12 @@ const AdminPage: React.FC = () => {
                                                     fontSize: '11px',
                                                     fontWeight: 600,
                                                     border: '1px solid rgba(16,185,129,0.2)',
-                                                    textDecoration: 'none',
+                                                    cursor: 'pointer',
                                                     transition: 'all 0.2s'
                                                   }}
                                                 >
                                                   <Download size={11} /> Excel
-                                                </a>
+                                                </button>
                                               </div>
                                             </td>
                                           </tr>
@@ -552,10 +563,8 @@ const AdminPage: React.FC = () => {
                           </td>
                           <td style={{ padding: '14px 12px', textAlign: 'center' }}>
                             <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                              <a
-                                href={adminDownloadCSV(d.id)}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                              <button
+                                onClick={() => handleDownload('csv', d.id)}
                                 style={{
                                   display: 'inline-flex',
                                   alignItems: 'center',
@@ -567,12 +576,12 @@ const AdminPage: React.FC = () => {
                                   fontSize: '12px',
                                   fontWeight: 600,
                                   border: '1px solid rgba(59, 130, 246, 0.2)',
-                                  textDecoration: 'none',
+                                  cursor: 'pointer',
                                   transition: 'all 0.2s'
                                 }}
                               >
                                 <Download size={12} /> Processed CSV
-                              </a>
+                              </button>
                             </div>
                           </td>
                         </tr>
