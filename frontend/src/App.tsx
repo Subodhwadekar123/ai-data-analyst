@@ -36,6 +36,9 @@ function App() {
     <BrowserRouter>
       <Toaster
         position="top-center"
+        containerStyle={{
+          left: '120px',  // Half of sidebar width (240px / 2) to center in content area
+        }}
         toastOptions={{
           style: {
             background: '#252836',
