@@ -191,5 +191,9 @@ export const adminDownloadExcel = (datasetId: string) => {
   const base = import.meta.env.VITE_API_URL || '/api/v1';
   return `${base}/admin/reports/${datasetId}/excel`;
 };
+export const adminDownloadCSV = (datasetId: string) => {
+  const base = import.meta.env.VITE_API_URL || '/api/v1';
+  return `${base}/cleaning/${datasetId}/export?format=csv`;
+};
 
 export default api;

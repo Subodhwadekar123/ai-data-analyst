@@ -27,7 +27,8 @@ import {
   toggleUserAccess,
   getUserDatasets,
   adminDownloadPDF,
-  adminDownloadExcel
+  adminDownloadExcel,
+  adminDownloadCSV
 } from '../services/api';
 import SectionHeader from '../components/ui/SectionHeader';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
@@ -496,7 +497,7 @@ const AdminPage: React.FC = () => {
                       <th style={{ padding: '12px' }}>Dimensions</th>
                       <th style={{ padding: '12px' }}>File Size</th>
                       <th style={{ padding: '12px' }}>Upload Date & Time</th>
-                      <th style={{ padding: '12px', textAlign: 'center' }}>Download Report</th>
+                      <th style={{ padding: '12px', textAlign: 'center' }}>Download Dataset</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -529,7 +530,7 @@ const AdminPage: React.FC = () => {
                           <td style={{ padding: '14px 12px', textAlign: 'center' }}>
                             <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
                               <a
-                                href={adminDownloadPDF(d.id)}
+                                href={adminDownloadCSV(d.id)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 style={{
@@ -538,37 +539,16 @@ const AdminPage: React.FC = () => {
                                   gap: '4px',
                                   padding: '5px 12px',
                                   borderRadius: '6px',
-                                  background: 'rgba(239,68,68,0.1)',
-                                  color: '#f87171',
+                                  background: 'rgba(59, 130, 246, 0.1)',
+                                  color: '#60a5fa',
                                   fontSize: '12px',
                                   fontWeight: 600,
-                                  border: '1px solid rgba(239,68,68,0.2)',
+                                  border: '1px solid rgba(59, 130, 246, 0.2)',
                                   textDecoration: 'none',
                                   transition: 'all 0.2s'
                                 }}
                               >
-                                <Download size={12} /> PDF
-                              </a>
-                              <a
-                                href={adminDownloadExcel(d.id)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  padding: '5px 12px',
-                                  borderRadius: '6px',
-                                  background: 'rgba(16,185,129,0.1)',
-                                  color: '#34d399',
-                                  fontSize: '12px',
-                                  fontWeight: 600,
-                                  border: '1px solid rgba(16,185,129,0.2)',
-                                  textDecoration: 'none',
-                                  transition: 'all 0.2s'
-                                }}
-                              >
-                                <Download size={12} /> Excel
+                                <Download size={12} /> Processed CSV
                               </a>
                             </div>
                           </td>
