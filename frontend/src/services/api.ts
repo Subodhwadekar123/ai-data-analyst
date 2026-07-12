@@ -179,9 +179,7 @@ export const login = (data: { email: string; password: string; force_login?: boo
   });
 };
 
-export const logout = () => {
-  return api.post('/auth/logout');
-} as Promise<any>;
+export const logout = () => api.post('/auth/logout') as Promise<any>;
 export const registerUser = (body: object) => api.post('/auth/register', body) as Promise<any>;
 export const getCurrentProfile = () => api.get('/auth/me') as Promise<any>;
 
