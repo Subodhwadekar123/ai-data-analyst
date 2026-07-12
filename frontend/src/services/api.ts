@@ -181,5 +181,15 @@ export const getAdminStats = () => api.get('/admin/stats') as Promise<any>;
 export const getAdminUsers = () => api.get('/admin/users') as Promise<any>;
 export const getAdminDatasets = () => api.get('/admin/datasets') as Promise<any>;
 export const getAdminIssues = () => api.get('/admin/issues') as Promise<any>;
+export const toggleUserAccess = (userId: string) => api.put(`/admin/users/${userId}/toggle-access`) as Promise<any>;
+export const getUserDatasets = (userId: string) => api.get(`/admin/users/${userId}/datasets`) as Promise<any>;
+export const adminDownloadPDF = (datasetId: string) => {
+  const base = import.meta.env.VITE_API_URL || '/api/v1';
+  return `${base}/admin/reports/${datasetId}/pdf`;
+};
+export const adminDownloadExcel = (datasetId: string) => {
+  const base = import.meta.env.VITE_API_URL || '/api/v1';
+  return `${base}/admin/reports/${datasetId}/excel`;
+};
 
 export default api;

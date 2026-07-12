@@ -6,13 +6,21 @@ Protected exclusively for Admin accounts.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
+import os
+import uuid
+import pandas as pd
 
 from app.database import get_db, UserRecord, DatasetRecord, MLExperiment, IssueRecord
 from app.routers.auth_deps import get_current_admin
+from app.routers.reports import _generate_pdf_report
+from app.services.data_service import DataService
+from app.services.stats_service import StatisticsService
+from app.config import settings
 from app.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -163,3 +171,150 @@ async def list_all_issues(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve feedback issues."
         )
+
+
+# ── New Admin Endpoints ──────────────────────────────────────────────────────
+
+@router.put("/users/{user_id}/toggle-access", summary="Toggle User Active Status")
+async def toggle_user_access(
+    user_id: str,
+    db: Session = Depends(get_db),
+    admin: UserRecord = Depends(get_current_admin)
+):
+    """Toggle a user's is_active status. Admins cannot deactivate themselves or other admins."""
+    target_user = db.query(UserRecord).filter(UserRecord.id == user_id).first()
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found."
+        )
+
+    if admin.id == user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You cannot deactivate your own admin account."
+        )
+
+    if target_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot deactivate another admin account."
+        )
+
+    target_user.is_active = not target_user.is_active
+    db.commit()
+
+    action = "activated" if target_user.is_active else "deactivated"
+    return {
+        "message": f"User {target_user.email} has been {action}.",
+        "user_id": user_id,
+        "is_active": target_user.is_active,
+    }
+
+
+@router.get("/users/{user_id}/datasets", response_model=List[AdminDatasetOut], summary="User Datasets")
+async def get_user_datasets(
+    user_id: str,
+    db: Session = Depends(get_db),
+    admin: UserRecord = Depends(get_current_admin)
+):
+    """Retrieves all datasets uploaded by a specific user."""
+    records = (
+        db.query(DatasetRecord)
+        .filter(DatasetRecord.user_id == user_id)
+        .order_by(DatasetRecord.created_at.desc())
+        .all()
+    )
+
+    results = []
+    for r in records:
+        owner_email = None
+        if r.user_id:
+            owner = db.query(UserRecord).filter(UserRecord.id == r.user_id).first()
+            if owner:
+                owner_email = owner.email
+        results.append({
+            "id": r.id,
+            "original_filename": r.original_filename,
+            "file_size_bytes": r.file_size_bytes,
+            "rows": r.rows,
+            "columns": r.columns,
+            "status": r.status,
+            "created_at": r.created_at,
+            "owner_email": owner_email or "Global/Anonymous",
+        })
+
+    return results
+
+
+@router.get("/reports/{dataset_id}/pdf", summary="Admin PDF Report")
+def admin_generate_pdf_report(
+    dataset_id: str,
+    admin: UserRecord = Depends(get_current_admin)
+):
+    """Admin endpoint to generate and download a PDF report for any dataset."""
+    try:
+        report_id = str(uuid.uuid4())[:8]
+        filename = f"admin_report_{dataset_id[:8]}_{report_id}.pdf"
+        file_path = os.path.join(settings.REPORTS_DIR, filename)
+
+        _generate_pdf_report(dataset_id, file_path)
+
+        return FileResponse(
+            file_path,
+            media_type="application/pdf",
+            filename="ai_data_analyst_report.pdf",
+        )
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Dataset not found.")
+    except Exception as e:
+        logger.error(f"Admin PDF report generation error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/reports/{dataset_id}/excel", summary="Admin Excel Report")
+def admin_generate_excel_report(
+    dataset_id: str,
+    admin: UserRecord = Depends(get_current_admin)
+):
+    """Admin endpoint to generate and download an Excel report for any dataset."""
+    try:
+        df = DataService.get_dataframe(dataset_id)
+        info = DataService.get_dataset_info(dataset_id)
+        stats = StatisticsService.descriptive_stats(df)
+
+        report_id = str(uuid.uuid4())[:8]
+        filename = f"admin_report_{dataset_id[:8]}_{report_id}.xlsx"
+        file_path = os.path.join(settings.REPORTS_DIR, filename)
+
+        with pd.ExcelWriter(file_path, engine="openpyxl") as writer:
+            # Sheet 1: Dataset preview
+            df.head(100).to_excel(writer, sheet_name="Preview (First 100)", index=False)
+
+            # Sheet 2: Descriptive statistics
+            if stats:
+                stats_df = pd.DataFrame(stats).T
+                stats_df.to_excel(writer, sheet_name="Descriptive Statistics")
+
+            # Sheet 3: Column info
+            col_info_df = pd.DataFrame(info["column_details"])
+            col_info_df.to_excel(writer, sheet_name="Column Information", index=False)
+
+            # Sheet 4: Missing values
+            if info["missing_info"]:
+                missing_df = pd.DataFrame([
+                    {"Column": k, "Missing Count": v["count"], "Missing %": v["percentage"]}
+                    for k, v in info["missing_info"].items()
+                ])
+                missing_df.to_excel(writer, sheet_name="Missing Values", index=False)
+
+        return FileResponse(
+            file_path,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            filename="ai_data_analyst_report.xlsx",
+        )
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Dataset not found.")
+    except Exception as e:
+        logger.error(f"Admin Excel report generation error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
