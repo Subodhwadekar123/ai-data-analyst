@@ -5,7 +5,9 @@
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import { useEffect } from 'react';
 import { useStore } from './store/useStore';
+import { healthCheck } from './services/api';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -25,6 +27,11 @@ import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
 
 function App() {
+  // Pre-warm the backend server (Render free tier goes to sleep after inactivity)
+  useEffect(() => {
+    healthCheck().catch(() => {});
+  }, []);
+
   return (
     <BrowserRouter>
       <Toaster
