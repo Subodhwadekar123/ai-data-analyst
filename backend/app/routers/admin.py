@@ -17,7 +17,6 @@ import pandas as pd
 
 from app.database import get_db, UserRecord, DatasetRecord, MLExperiment, IssueRecord
 from app.routers.auth_deps import get_current_admin
-from app.routers.reports import _generate_pdf_report
 from app.services.data_service import DataService
 from app.services.stats_service import StatisticsService
 from app.config import settings
@@ -254,6 +253,9 @@ def admin_generate_pdf_report(
 ):
     """Admin endpoint to generate and download a PDF report for any dataset."""
     try:
+        # Import here to avoid circular import between routers
+        from app.routers.reports import _generate_pdf_report
+
         report_id = str(uuid.uuid4())[:8]
         filename = f"admin_report_{dataset_id[:8]}_{report_id}.pdf"
         file_path = os.path.join(settings.REPORTS_DIR, filename)
