@@ -180,7 +180,15 @@ export const getCurrentProfile = () => api.get('/auth/me') as Promise<any>;
 export const getAdminStats = () => api.get('/admin/stats') as Promise<any>;
 export const getAdminUsers = () => api.get('/admin/users') as Promise<any>;
 export const getAdminDatasets = () => api.get('/admin/datasets') as Promise<any>;
-export const getAdminIssues = () => api.get('/admin/issues') as Promise<any>;
+export const getAdminIssues = async () => {
+  const response = await api.get('/admin/issues');
+  return response.data;
+};
+
+export const deleteIssue = async (issueId: number) => {
+  const response = await api.delete(`/admin/issues/${issueId}`);
+  return response.data;
+};
 export const toggleUserAccess = (userId: string) => api.put(`/admin/users/${userId}/toggle-access`) as Promise<any>;
 export const getUserDatasets = (userId: string) => api.get(`/admin/users/${userId}/datasets`) as Promise<any>;
 export const adminDownloadPDF = (datasetId: string) => {

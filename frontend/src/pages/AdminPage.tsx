@@ -17,7 +17,8 @@ import {
   ChevronDown,
   ChevronUp,
   Clock,
-  X
+  X,
+  Trash2
 } from 'lucide-react';
 import {
   getAdminStats,
@@ -28,7 +29,8 @@ import {
   getUserDatasets,
   adminDownloadPDF,
   adminDownloadExcel,
-  adminDownloadCSV
+  adminDownloadCSV,
+  deleteIssue
 } from '../services/api';
 import SectionHeader from '../components/ui/SectionHeader';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
@@ -49,6 +51,9 @@ const AdminPage: React.FC = () => {
 
   // State for toggling user access
   const [togglingUserId, setTogglingUserId] = useState<string | null>(null);
+
+  // State for deleting issues
+  const [deletingIssueId, setDeletingIssueId] = useState<number | null>(null);
 
   const fetchAdminData = async () => {
     setLoading(true);
@@ -90,6 +95,22 @@ const AdminPage: React.FC = () => {
     }
   };
 
+  // Delete an issue
+  const handleDeleteIssue = async (issueId: number) => {
+    if (!window.confirm('Are you sure you want to delete this issue?')) return;
+    setDeletingIssueId(issueId);
+    try {
+      await deleteIssue(issueId);
+      toast.success('Issue deleted successfully');
+      const issuesData = await getAdminIssues();
+      setIssuesList(issuesData);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete issue.');
+    } finally {
+      setDeletingIssueId(null);
+    }
+  };
+
   // Expand user row to show their datasets
   const handleViewUserDatasets = async (userId: string) => {
     if (expandedUserId === userId) {
@@ -128,8 +149,10 @@ const AdminPage: React.FC = () => {
     );
   }
 
+  const activeUserCount = usersList.length > 0 ? usersList.filter(u => u.is_active).length : (stats?.total_users || 0);
+
   const statCards = [
-    { label: 'Total Registered Users', value: stats?.total_users || 0, icon: Users, color: '#6366f1' },
+    { label: 'Active Registered Users', value: activeUserCount, icon: Users, color: '#6366f1' },
     { label: 'Datasets Uploaded', value: stats?.total_datasets || 0, icon: Database, color: '#3b82f6' },
     { label: 'ML Experiments Run', value: stats?.total_experiments || 0, icon: Activity, color: '#10b981' },
     { label: 'Reported Issues', value: stats?.total_issues || 0, icon: AlertCircle, color: '#f59e0b' }
@@ -594,19 +617,41 @@ const AdminPage: React.FC = () => {
                         <h4 style={{ margin: 0, fontSize: '16px', color: 'white', fontWeight: 600 }}>
                           #{issue.id} - {issue.title}
                         </h4>
-                        <span
-                          style={{
-                            padding: '3px 10px',
-                            borderRadius: '99px',
-                            background: getCategoryStyle(issue.category).bg,
-                            color: getCategoryStyle(issue.category).fg,
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            border: `1px solid ${getCategoryStyle(issue.category).border}`
-                          }}
-                        >
-                          {issue.category.toUpperCase()}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span
+                            style={{
+                              padding: '3px 10px',
+                              borderRadius: '99px',
+                              background: getCategoryStyle(issue.category).bg,
+                              color: getCategoryStyle(issue.category).fg,
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              border: `1px solid ${getCategoryStyle(issue.category).border}`
+                            }}
+                          >
+                            {issue.category.toUpperCase()}
+                          </span>
+                          <button
+                            onClick={() => handleDeleteIssue(issue.id)}
+                            disabled={deletingIssueId === issue.id}
+                            style={{
+                              background: 'rgba(239, 68, 68, 0.1)',
+                              border: '1px solid rgba(239, 68, 68, 0.2)',
+                              color: '#f87171',
+                              borderRadius: '6px',
+                              padding: '4px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'all 0.2s',
+                              opacity: deletingIssueId === issue.id ? 0.5 : 1
+                            }}
+                            title="Delete Issue"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </div>
                       
                       <p style={{ fontSize: '14px', color: '#e2e8f0', margin: '0 0 16px', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>

@@ -174,6 +174,23 @@ async def list_all_issues(
 
 # ── New Admin Endpoints ──────────────────────────────────────────────────────
 
+@router.delete("/issues/{issue_id}", summary="Delete System Issue")
+async def delete_issue(
+    issue_id: int,
+    db: Session = Depends(get_db),
+    admin: UserRecord = Depends(get_current_admin)
+):
+    """Deletes a reported issue from the system."""
+    issue = db.query(IssueRecord).filter(IssueRecord.id == issue_id).first()
+    if not issue:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Issue not found."
+        )
+    db.delete(issue)
+    db.commit()
+    return {"message": "Issue deleted successfully."}
+
 @router.put("/users/{user_id}/toggle-access", summary="Toggle User Active Status")
 async def toggle_user_access(
     user_id: str,
