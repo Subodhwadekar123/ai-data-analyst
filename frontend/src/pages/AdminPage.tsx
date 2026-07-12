@@ -25,7 +25,7 @@ import {
   getAdminUsers,
   getAdminDatasets,
   getAdminIssues,
-  toggleUserAccess,
+  forceLogoutUser,
   getUserDatasets,
   adminDownloadPDF,
   adminDownloadExcel,
@@ -79,17 +79,18 @@ const AdminPage: React.FC = () => {
     fetchAdminData();
   }, []);
 
-  // Toggle user active/suspended status
-  const handleToggleAccess = async (userId: string, userName: string) => {
+  // Force a user to logout
+  const handleForceLogout = async (userId: string, userName: string) => {
+    if (!window.confirm(`Are you sure you want to forcefully logout ${userName}? Their current session will be terminated.`)) return;
     setTogglingUserId(userId);
     try {
-      const result = await toggleUserAccess(userId);
-      toast.success(result.message || `Access updated for ${userName}`);
+      const result = await forceLogoutUser(userId);
+      toast.success(result.message || `Session terminated for ${userName}`);
       // Refresh users list
       const usersData = await getAdminUsers();
       setUsersList(usersData);
     } catch (err: any) {
-      toast.error(err.message || 'Failed to toggle user access.');
+      toast.error(err.message || 'Failed to force logout user.');
     } finally {
       setTogglingUserId(null);
     }
@@ -164,10 +165,10 @@ const AdminPage: React.FC = () => {
     );
   }
 
-  const activeUserCount = usersList.length > 0 ? usersList.filter(u => u.is_active).length : (stats?.total_users || 0);
+  const onlineUserCount = usersList.length > 0 ? usersList.filter(u => u.is_online).length : 0;
 
   const statCards = [
-    { label: 'Active Registered Users', value: activeUserCount, icon: Users, color: '#6366f1' },
+    { label: 'Currently Online Users', value: onlineUserCount, icon: Users, color: '#6366f1' },
     { label: 'Datasets Uploaded', value: stats?.total_datasets || 0, icon: Database, color: '#3b82f6' },
     { label: 'ML Experiments Run', value: stats?.total_experiments || 0, icon: Activity, color: '#10b981' },
     { label: 'Reported Issues', value: stats?.total_issues || 0, icon: AlertCircle, color: '#f59e0b' }
@@ -331,8 +332,8 @@ const AdminPage: React.FC = () => {
                               )}
                             </td>
                             <td style={{ padding: '14px 12px' }}>
-                              <span style={{ color: user.is_active ? '#10b981' : '#ef4444', fontWeight: 500 }}>
-                                ● {user.is_active ? 'Active' : 'Suspended'}
+                              <span style={{ color: user.is_online ? '#10b981' : '#64748b', fontWeight: 500 }}>
+                                ● {user.is_online ? 'Online' : 'Offline'}
                               </span>
                             </td>
                             <td style={{ padding: '14px 12px' }}>
@@ -343,21 +344,21 @@ const AdminPage: React.FC = () => {
                             </td>
                             <td style={{ padding: '14px 12px', textAlign: 'center' }}>
                               <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                                {/* Toggle Access Button */}
-                                {!user.is_admin && (
+                                {/* Force Logout Button */}
+                                {!user.is_admin && user.is_online && (
                                   <button
-                                    onClick={() => handleToggleAccess(user.id, user.full_name || user.email)}
+                                    onClick={() => handleForceLogout(user.id, user.full_name || user.email)}
                                     disabled={togglingUserId === user.id}
-                                    title={user.is_active ? 'Suspend User' : 'Activate User'}
+                                    title="Force Logout User"
                                     style={{
                                       display: 'flex',
                                       alignItems: 'center',
                                       gap: '5px',
                                       padding: '6px 12px',
                                       borderRadius: '8px',
-                                      border: `1px solid ${user.is_active ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.3)'}`,
-                                      background: user.is_active ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)',
-                                      color: user.is_active ? '#ef4444' : '#10b981',
+                                      border: '1px solid rgba(239,68,68,0.3)',
+                                      background: 'rgba(239,68,68,0.1)',
+                                      color: '#ef4444',
                                       fontSize: '12px',
                                       fontWeight: 600,
                                       cursor: togglingUserId === user.id ? 'wait' : 'pointer',
@@ -366,7 +367,7 @@ const AdminPage: React.FC = () => {
                                     }}
                                   >
                                     <Power size={13} />
-                                    {togglingUserId === user.id ? '...' : user.is_active ? 'Suspend' : 'Activate'}
+                                    {togglingUserId === user.id ? '...' : 'Force Logout'}
                                   </button>
                                 )}
                                 {/* View Datasets Button */}

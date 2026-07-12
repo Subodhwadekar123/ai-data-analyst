@@ -46,8 +46,10 @@ async def get_current_user(auth: str = Depends(auth_header), db: Session = Depen
     if user is None:
         raise credentials_exception
         
-    if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Your user account is suspended.")
+    # Verify that the token matches the user's current active session
+    token_session = payload.get("session_token")
+    if token_session is None or token_session != user.session_token:
+        raise credentials_exception
         
     return user
 

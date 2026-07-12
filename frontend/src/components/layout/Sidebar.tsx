@@ -389,7 +389,13 @@ const Sidebar: React.FC = () => {
           }}
         >
           <button
-            onClick={() => {
+            onClick={async () => {
+              try {
+                const api = await import('../../services/api');
+                await api.logout();
+              } catch (e) {
+                console.error('Backend logout failed', e);
+              }
               logout();
               navigate('/');
               toast.success('Logged out successfully.');

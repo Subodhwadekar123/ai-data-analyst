@@ -38,8 +38,8 @@ class AdminUserOut(BaseModel):
     id: str
     email: str
     full_name: Optional[str]
-    is_active: bool
     is_admin: bool
+    is_online: bool
     created_at: datetime
 
     class Config:
@@ -108,7 +108,18 @@ async def list_all_users(
     """Retrieves all registered platform users, ordered by registration date."""
     try:
         users = db.query(UserRecord).order_by(UserRecord.created_at.desc()).all()
-        return users
+        # Add is_online property based on session_token
+        result = []
+        for u in users:
+            result.append({
+                "id": u.id,
+                "email": u.email,
+                "full_name": u.full_name,
+                "is_admin": u.is_admin,
+                "is_online": u.session_token is not None,
+                "created_at": u.created_at
+            })
+        return result
     except Exception as e:
         logger.error(f"Failed to query users: {e}", exc_info=True)
         raise HTTPException(
@@ -191,40 +202,40 @@ async def delete_issue(
     db.commit()
     return {"message": "Issue deleted successfully."}
 
-@router.put("/users/{user_id}/toggle-access", summary="Toggle User Active Status")
-async def toggle_user_access(
+@router.put("/users/{user_id}/force-logout", summary="Force Logout User")
+async def force_logout_user(
     user_id: str,
     db: Session = Depends(get_db),
     admin: UserRecord = Depends(get_current_admin)
 ):
-    """Toggle a user's is_active status. Admins cannot deactivate themselves or other admins."""
+    """Forces an active user session to terminate."""
     target_user = db.query(UserRecord).filter(UserRecord.id == user_id).first()
+    
     if not target_user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found."
         )
-
+        
     if admin.id == user_id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You cannot deactivate your own admin account."
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot force logout yourself from this panel."
         )
 
     if target_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot deactivate another admin account."
+            detail="Cannot force logout other administrators."
         )
 
-    target_user.is_active = not target_user.is_active
+    target_user.session_token = None
     db.commit()
-
-    action = "activated" if target_user.is_active else "deactivated"
+    
     return {
-        "message": f"User {target_user.email} has been {action}.",
-        "user_id": user_id,
-        "is_active": target_user.is_active,
+        "message": f"Successfully forced logout for {target_user.email}",
+        "user_id": target_user.id,
+        "is_online": False
     }
 
 

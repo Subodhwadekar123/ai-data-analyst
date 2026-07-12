@@ -30,6 +30,7 @@ class UserRegister(BaseModel):
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+    force_login: bool = False
 
 
 # ── Pydantic Response Models ─────────────────────────────────────────────────
@@ -97,14 +98,19 @@ async def login_user(user_in: UserLogin, db: Session = Depends(get_db)):
             detail="Invalid email or password. Please try again."
         )
     
-    if not user.is_active:
+    # Check active session for concurrent logins
+    if user.session_token and not user_in.force_login:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Your user account is suspended."
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User is already logged in elsewhere."
         )
 
-    # Generate Token
-    token_data = {"sub": user.id, "email": user.email, "is_admin": user.is_admin}
+    # Invalidate old session and generate new one
+    user.session_token = str(uuid.uuid4())
+    db.commit()
+
+    # Generate Token with session identifier
+    token_data = {"sub": user.id, "email": user.email, "is_admin": user.is_admin, "session_token": user.session_token}
     token = create_access_token(token_data)
     
     logger.info(f"🔑 User logged in: {user.email}")
@@ -113,6 +119,14 @@ async def login_user(user_in: UserLogin, db: Session = Depends(get_db)):
         "token_type": "bearer",
         "user": user
     }
+
+@router.post("/logout", summary="Logout User")
+async def logout_user(current_user: UserRecord = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Logs out the user by clearing their active session token."""
+    current_user.session_token = None
+    db.commit()
+    logger.info(f"🚪 User logged out: {current_user.email}")
+    return {"message": "Successfully logged out."}
 
 
 @router.get("/me", response_model=UserOut, summary="Get Current Profile")

@@ -94,6 +94,7 @@ class UserRecord(Base):
     full_name = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
+    session_token = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -101,6 +102,16 @@ class UserRecord(Base):
 def init_db() -> None:
     """Create all database tables and seed initial admin user."""
     Base.metadata.create_all(bind=engine)
+
+    # Attempt to gracefully add the session_token column to existing databases
+    try:
+        from sqlalchemy import text
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN session_token VARCHAR;"))
+            print("🚀 Successfully migrated 'users' table to include 'session_token'.")
+    except Exception as e:
+        # Ignore if the column already exists
+        pass
 
     # Seed admin user if none exists
     db = SessionLocal()

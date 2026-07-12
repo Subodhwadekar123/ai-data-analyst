@@ -171,7 +171,17 @@ export const downloadIssuesCSV = () => '/api/v1/issues/download';
 
 // ── Authentication ─────────────────────────────────────────────────────────
 
-export const loginUser = (body: object) => api.post('/auth/login', body) as Promise<any>;
+export const login = (data: { email: string; password: string; force_login?: boolean }) => {
+  return api.post('/auth/login', {
+    email: data.email,
+    password: data.password,
+    force_login: data.force_login || false
+  });
+};
+
+export const logout = () => {
+  return api.post('/auth/logout');
+} as Promise<any>;
 export const registerUser = (body: object) => api.post('/auth/register', body) as Promise<any>;
 export const getCurrentProfile = () => api.get('/auth/me') as Promise<any>;
 
@@ -183,7 +193,7 @@ export const getAdminDatasets = () => api.get('/admin/datasets') as Promise<any>
 export const getAdminIssues = () => api.get('/admin/issues') as Promise<any>;
 
 export const deleteIssue = (issueId: number) => api.delete(`/admin/issues/${issueId}`) as Promise<any>;
-export const toggleUserAccess = (userId: string) => api.put(`/admin/users/${userId}/toggle-access`) as Promise<any>;
+export const forceLogoutUser = (userId: string) => api.put(`/admin/users/${userId}/force-logout`) as Promise<any>;
 export const getUserDatasets = (userId: string) => api.get(`/admin/users/${userId}/datasets`) as Promise<any>;
 // ── File Downloads ─────────────────────────────────────────────────────────
 

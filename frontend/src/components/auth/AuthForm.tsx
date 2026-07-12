@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Shield, Mail, Lock, User, RefreshCw, Info } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import { loginUser, registerUser } from '../../services/api';
+import { login, registerUser } from '../../services/api';
 
 interface AuthFormProps {
   onSuccess?: () => void;
@@ -18,6 +18,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, initialMode = 'login' })
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showForceModal, setShowForceModal] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,7 +36,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, initialMode = 'login' })
 
     try {
       if (mode === 'login') {
-        const res = await loginUser({ email, password });
+        const res = await login({ email, password });
         setToken(res.access_token);
         setUser(res.user);
         toast.dismiss(loadingToast);
@@ -50,6 +51,29 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, initialMode = 'login' })
         setMode('login');
         setLoading(false);
       }
+    } catch (err: any) {
+      toast.dismiss(loadingToast);
+      if (err.message && err.message.includes('already logged in elsewhere')) {
+        setShowForceModal(true);
+      } else {
+        toast.error(err.message || 'Authentication failed.');
+      }
+      setLoading(false);
+    }
+  };
+
+  const handleForceLogin = async () => {
+    setShowForceModal(false);
+    setLoading(true);
+    const loadingToast = toast.loading('Forcing logout of other session...');
+    try {
+      const res = await login({ email, password, force_login: true });
+      setToken(res.access_token);
+      setUser(res.user);
+      toast.dismiss(loadingToast);
+      toast.success(`Successfully logged in and terminated old session!`);
+      if (onSuccess) onSuccess();
+      navigate('/dashboard/upload');
     } catch (err: any) {
       toast.dismiss(loadingToast);
       toast.error(err.message || 'Authentication failed.');
@@ -246,6 +270,38 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, initialMode = 'login' })
           {mode === 'login' ? 'Sign Up' : 'Log In'}
         </button>
       </div>
+
+      {/* Force Login Modal */}
+      {showForceModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
+        }}>
+          <div style={{
+            background: '#1e293b', border: '1px solid #334155', borderRadius: '16px',
+            padding: '30px', maxWidth: '400px', width: '90%', textAlign: 'center'
+          }}>
+            <h3 style={{ margin: '0 0 16px', color: '#f87171', fontSize: '20px', fontWeight: 600 }}>Active Session Detected</h3>
+            <p style={{ color: '#cbd5e1', fontSize: '14px', marginBottom: '24px', lineHeight: '1.5' }}>
+              Your account is already logged in on another device or browser. Do you want to forcefully logout the other session and login here?
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button
+                onClick={() => setShowForceModal(false)}
+                style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid #475569', background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontWeight: 600 }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleForceLogin}
+                style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: '#f87171', color: 'white', cursor: 'pointer', fontWeight: 600 }}
+              >
+                Yes, Force Login
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
