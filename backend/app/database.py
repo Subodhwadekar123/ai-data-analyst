@@ -116,7 +116,7 @@ def init_db() -> None:
     try:
         from sqlalchemy import text
         with engine.begin() as conn:
-            conn.execute(text("ALTER TABLE users ADD COLUMN last_login DATETIME;"))
+            conn.execute(text("ALTER TABLE users ADD COLUMN last_login TIMESTAMP;"))
             print("🚀 Successfully migrated 'users' table to include 'last_login'.")
     except Exception as e:
         pass
