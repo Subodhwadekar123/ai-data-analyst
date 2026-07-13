@@ -95,6 +95,7 @@ class UserRecord(Base):
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
     session_token = Column(String, nullable=True)
+    last_login = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -110,7 +111,14 @@ def init_db() -> None:
             conn.execute(text("ALTER TABLE users ADD COLUMN session_token VARCHAR;"))
             print("🚀 Successfully migrated 'users' table to include 'session_token'.")
     except Exception as e:
-        # Ignore if the column already exists
+        pass
+
+    try:
+        from sqlalchemy import text
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN last_login DATETIME;"))
+            print("🚀 Successfully migrated 'users' table to include 'last_login'.")
+    except Exception as e:
         pass
 
     # Seed admin user if none exists

@@ -40,6 +40,7 @@ class AdminUserOut(BaseModel):
     full_name: Optional[str]
     is_admin: bool
     is_online: bool
+    last_login: Optional[datetime] = None
     created_at: datetime
 
     class Config:

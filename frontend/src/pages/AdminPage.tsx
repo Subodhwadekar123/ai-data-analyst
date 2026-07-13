@@ -339,7 +339,7 @@ const AdminPage: React.FC = () => {
                             <td style={{ padding: '14px 12px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#64748b' }}>
                                 <Clock size={14} />
-                                {formatDateTime(user.created_at)}
+                                {user.last_login ? formatDateTime(user.last_login) : 'Never'}
                               </div>
                             </td>
                             <td style={{ padding: '14px 12px', textAlign: 'center' }}>

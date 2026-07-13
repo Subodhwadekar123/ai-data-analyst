@@ -40,6 +40,7 @@ class UserOut(BaseModel):
     full_name: Optional[str]
     is_active: bool
     is_admin: bool
+    last_login: Optional[datetime] = None
     created_at: datetime
 
     class Config:
@@ -105,8 +106,9 @@ async def login_user(user_in: UserLogin, db: Session = Depends(get_db)):
             detail="User is already logged in elsewhere."
         )
 
-    # Invalidate old session and generate new one
+    # Invalidate old session, generate new one, update last_login
     user.session_token = str(uuid.uuid4())
+    user.last_login = datetime.utcnow()
     db.commit()
 
     # Generate Token with session identifier
