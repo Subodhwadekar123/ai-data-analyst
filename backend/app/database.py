@@ -109,7 +109,7 @@ def init_db() -> None:
         from sqlalchemy import text
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE users ADD COLUMN session_token VARCHAR;"))
-            print("🚀 Successfully migrated 'users' table to include 'session_token'.")
+            print("Successfully migrated 'users' table to include 'session_token'.")
     except Exception as e:
         pass
 
@@ -117,7 +117,7 @@ def init_db() -> None:
         from sqlalchemy import text
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE users ADD COLUMN last_login TIMESTAMP;"))
-            print("🚀 Successfully migrated 'users' table to include 'last_login'.")
+            print("Successfully migrated 'users' table to include 'last_login'.")
     except Exception as e:
         pass
 
@@ -141,12 +141,12 @@ def init_db() -> None:
             )
             db.add(admin_user)
             db.commit()
-            print("🚀 Seeded initial admin user: admin@datamind.ai")
+            print("Seeded initial admin user: admin@datamind.ai")
         else:
             exists.hashed_password = hashed_pass
             exists.full_name = "System Admin Subodh"
             db.commit()
-            print("🚀 Updated admin password and name to matching seed: admin@datamind.ai")
+            print("Updated admin password and name to matching seed: admin@datamind.ai")
     except Exception as e:
         print(f"Error seeding admin user: {e}")
         db.rollback()

@@ -50,14 +50,14 @@ logger = setup_logger(__name__)
 async def lifespan(app: FastAPI):
     """Application lifecycle management."""
     # Startup
-    logger.info(f"🚀 Starting {settings.APP_NAME} v{settings.APP_VERSION}")
-    logger.info(f"📁 Upload directory: {settings.UPLOAD_DIR}")
-    logger.info(f"📊 Reports directory: {settings.REPORTS_DIR}")
+    logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
+    logger.info(f"Upload directory: {settings.UPLOAD_DIR}")
+    logger.info(f"Reports directory: {settings.REPORTS_DIR}")
     init_db()
-    logger.info("✅ Database initialized")
+    logger.info("Database initialized")
     yield
     # Shutdown
-    logger.info("👋 Shutting down AI Data Analyst")
+    logger.info("Shutting down AI Data Analyst")
 
 
 # ── Application Factory ────────────────────────────────────────────────────────
