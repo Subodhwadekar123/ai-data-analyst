@@ -107,9 +107,19 @@ async def login_user(user_in: UserLogin, db: Session = Depends(get_db)):
         )
 
     # Invalidate old session, generate new one, update last_login
-    user.session_token = str(uuid.uuid4())
-    user.last_login = datetime.utcnow()
-    db.commit()
+    new_token = str(uuid.uuid4())
+    try:
+        user.session_token = new_token
+        user.last_login = datetime.utcnow()
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        # Fallback if last_login column does not exist
+        logger.warning(f"Failed to update last_login (schema mismatch). Falling back to session_token only. Error: {e}")
+        from sqlalchemy import text
+        db.execute(text("UPDATE users SET session_token = :t WHERE id = :id"), {"t": new_token, "id": user.id})
+        db.commit()
+        user.session_token = new_token
 
     # Generate Token with session identifier
     token_data = {"sub": user.id, "email": user.email, "is_admin": user.is_admin, "session_token": user.session_token}
