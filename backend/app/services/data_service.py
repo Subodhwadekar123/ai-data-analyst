@@ -22,6 +22,8 @@ logger = setup_logger(__name__)
 # In-memory DataFrame store: {dataset_id: pd.DataFrame}
 _dataframe_store: Dict[str, pd.DataFrame] = {}
 
+# In-memory Action Ledger: {dataset_id: [{"action": "drop_columns", "params": {...}}]}
+_action_ledger_store: Dict[str, List[Dict[str, Any]]] = {}
 
 class DataService:
     """
@@ -106,7 +108,24 @@ class DataService:
     def remove_dataframe(dataset_id: str) -> None:
         """Remove a dataset from memory."""
         _dataframe_store.pop(dataset_id, None)
+        _action_ledger_store.pop(dataset_id, None)
         analysis_cache.clear_dataset(dataset_id)
+
+    @staticmethod
+    def log_action(dataset_id: str, action_type: str, params: Dict[str, Any]) -> None:
+        """Log a data manipulation action to the ledger."""
+        if dataset_id not in _action_ledger_store:
+            _action_ledger_store[dataset_id] = []
+        _action_ledger_store[dataset_id].append({
+            "action": action_type,
+            "params": params,
+            "timestamp": datetime.utcnow().isoformat()
+        })
+
+    @staticmethod
+    def get_action_ledger(dataset_id: str) -> List[Dict[str, Any]]:
+        """Get the full action ledger for a dataset."""
+        return _action_ledger_store.get(dataset_id, [])
 
     # ── Auto-detection ─────────────────────────────────────────────────────────
 

@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import List, Optional, Any
 from app.services.cleaning_service import CleaningService
+from app.services.data_service import DataService
 from app.utils.logger import setup_logger
 
 router = APIRouter()
@@ -60,30 +61,40 @@ class SkewnessRequest(BaseModel):
 @router.post("/cleaning/{dataset_id}/missing-values")
 def handle_missing_values(dataset_id: str, req: MissingValuesRequest):
     try:
-        return CleaningService.handle_missing_values(dataset_id, req.strategy, req.columns, req.fill_value)
+        res = CleaningService.handle_missing_values(dataset_id, req.strategy, req.columns, req.fill_value)
+        DataService.log_action(dataset_id, "missing_values", req.dict())
+        return res
     except (ValueError, FileNotFoundError) as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/cleaning/{dataset_id}/remove-duplicates")
 def remove_duplicates(dataset_id: str, subset: Optional[List[str]] = None):
-    return CleaningService.remove_duplicates(dataset_id, subset)
+    res = CleaningService.remove_duplicates(dataset_id, subset)
+    DataService.log_action(dataset_id, "remove_duplicates", {"subset": subset})
+    return res
 
 
 @router.post("/cleaning/{dataset_id}/rename-columns")
 def rename_columns(dataset_id: str, req: RenameRequest):
-    return CleaningService.rename_columns(dataset_id, req.rename_map)
+    res = CleaningService.rename_columns(dataset_id, req.rename_map)
+    DataService.log_action(dataset_id, "rename_columns", req.dict())
+    return res
 
 
 @router.post("/cleaning/{dataset_id}/drop-columns")
 def drop_columns(dataset_id: str, req: DropColumnsRequest):
-    return CleaningService.drop_columns(dataset_id, req.columns)
+    res = CleaningService.drop_columns(dataset_id, req.columns)
+    DataService.log_action(dataset_id, "drop_columns", req.dict())
+    return res
 
 
 @router.post("/cleaning/{dataset_id}/convert-dtype")
 def convert_dtype(dataset_id: str, req: ConvertDtypeRequest):
     try:
-        return CleaningService.convert_dtype(dataset_id, req.column, req.target_dtype)
+        res = CleaningService.convert_dtype(dataset_id, req.column, req.target_dtype)
+        DataService.log_action(dataset_id, "convert_dtype", req.dict())
+        return res
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -91,7 +102,9 @@ def convert_dtype(dataset_id: str, req: ConvertDtypeRequest):
 @router.post("/cleaning/{dataset_id}/handle-outliers")
 def handle_outliers(dataset_id: str, req: OutlierRequest):
     try:
-        return CleaningService.handle_outliers(dataset_id, req.column, req.method, req.strategy, req.threshold)
+        res = CleaningService.handle_outliers(dataset_id, req.column, req.method, req.strategy, req.threshold)
+        DataService.log_action(dataset_id, "handle_outliers", req.dict())
+        return res
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -99,7 +112,9 @@ def handle_outliers(dataset_id: str, req: OutlierRequest):
 @router.post("/cleaning/{dataset_id}/normalize")
 def normalize(dataset_id: str, req: NormalizeRequest):
     try:
-        return CleaningService.normalize(dataset_id, req.columns, req.method)
+        res = CleaningService.normalize(dataset_id, req.columns, req.method)
+        DataService.log_action(dataset_id, "normalize", req.dict())
+        return res
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -107,7 +122,9 @@ def normalize(dataset_id: str, req: NormalizeRequest):
 @router.post("/cleaning/{dataset_id}/encode")
 def encode_column(dataset_id: str, req: EncodeRequest):
     try:
-        return CleaningService.encode_column(dataset_id, req.column, req.method, req.categories)
+        res = CleaningService.encode_column(dataset_id, req.column, req.method, req.categories)
+        DataService.log_action(dataset_id, "encode_column", req.dict())
+        return res
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -115,14 +132,18 @@ def encode_column(dataset_id: str, req: EncodeRequest):
 @router.post("/cleaning/{dataset_id}/handle-skewness")
 def handle_skewness(dataset_id: str, req: SkewnessRequest):
     try:
-        return CleaningService.handle_skewness(dataset_id, req.column, req.method)
+        res = CleaningService.handle_skewness(dataset_id, req.column, req.method)
+        DataService.log_action(dataset_id, "handle_skewness", req.dict())
+        return res
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/cleaning/{dataset_id}/remove-constants")
 def remove_constant_features(dataset_id: str):
-    return CleaningService.remove_constant_features(dataset_id)
+    res = CleaningService.remove_constant_features(dataset_id)
+    DataService.log_action(dataset_id, "remove_constants", {})
+    return res
 
 
 @router.get("/cleaning/{dataset_id}/export")

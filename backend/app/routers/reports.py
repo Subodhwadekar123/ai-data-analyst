@@ -16,6 +16,7 @@ from app.services.data_service import DataService
 from app.services.eda_service import EDAService
 from app.services.stats_service import StatisticsService
 from app.services.ai_service import AIService
+from app.services.jupyter_service import JupyterService
 from app.config import settings
 from app.utils.logger import setup_logger
 
@@ -377,4 +378,18 @@ def generate_excel_report(dataset_id: str):
         )
     except Exception as e:
         logger.error(f"Excel report error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/reports/{dataset_id}/jupyter")
+def download_jupyter_report(dataset_id: str):
+    """Generate and download a Jupyter Notebook replication of analysis."""
+    try:
+        file_path = JupyterService.generate_notebook(dataset_id)
+        return FileResponse(
+            file_path,
+            media_type="application/x-ipynb+json",
+            filename="datamind_notebook.ipynb",
+        )
+    except Exception as e:
+        logger.error(f"Jupyter export error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

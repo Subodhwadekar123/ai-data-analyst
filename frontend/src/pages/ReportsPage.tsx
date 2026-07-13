@@ -11,9 +11,10 @@ import {
   BarChart2,
   Database,
   ArrowDown,
+  Code,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { downloadPDFReport, downloadExcelReport, getQualityScore } from '../services/api';
+import { downloadPDFReport, downloadExcelReport, downloadJupyterReport, getQualityScore } from '../services/api';
 import EmptyState from '../components/ui/EmptyState';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -237,6 +238,12 @@ const ReportsPage: React.FC = () => {
     toast.success('Excel report download started!');
   };
 
+  const handleJupyterDownload = () => {
+    const url = downloadJupyterReport(activeDataset.id);
+    window.open(url, '_blank');
+    toast.success('Jupyter Notebook generated!');
+  };
+
   const { dataset_info } = activeDataset;
 
   const pdfContents = [
@@ -254,6 +261,14 @@ const ReportsPage: React.FC = () => {
     'Sheet 3: Correlations',
     'Sheet 4: Missing Values',
     'Sheet 5: Summary',
+  ];
+
+  const jupyterContents = [
+    'Cell 1: Environment Setup',
+    'Cell 2: Data Loading',
+    'Cell 3: Exact Cleaning Steps',
+    'Cell 4: Exploratory Analysis',
+    'Standard ML Boilerplate',
   ];
 
   return (
@@ -277,7 +292,7 @@ const ReportsPage: React.FC = () => {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
+          gridTemplateColumns: 'repeat(3, 1fr)',
           gap: '24px',
           marginBottom: '32px',
         }}
@@ -304,6 +319,17 @@ const ReportsPage: React.FC = () => {
           onClick={handleExcelDownload}
           delay={0.1}
         />
+        <DownloadCard
+          icon={<Code size={32} />}
+          title="Jupyter Notebook"
+          description="A programmatic Kaggle-style notebook containing the Python code to reproduce your cleaning and visualization steps."
+          badgeLabel="IPYNB"
+          estimatedSize="~10-50 KB"
+          gradient="linear-gradient(135deg, #eab308, #d97706)"
+          buttonLabel="Generate Notebook"
+          onClick={handleJupyterDownload}
+          delay={0.2}
+        />
       </div>
 
       {/* ── What's included ─────────────────────────────────────────────────── */}
@@ -317,7 +343,7 @@ const ReportsPage: React.FC = () => {
           <Sparkles size={18} style={{ marginRight: 8, verticalAlign: 'middle', color: '#6366f1' }} />
           What's Included
         </h2>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
           {/* PDF contents */}
           <div
             className="card"
@@ -366,6 +392,32 @@ const ReportsPage: React.FC = () => {
               <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#e2e8f0' }}>Excel Workbook</h3>
             </div>
             {excelContents.map((item, i) => (
+              <ContentItem key={i} label={item} index={i} />
+            ))}
+          </div>
+
+          {/* Jupyter contents */}
+          <div
+            className="card"
+            style={{ border: '1px solid #eab30833' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+              <div
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: '8px',
+                  background: 'linear-gradient(135deg, #eab308, #d97706)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Code size={16} color="#fff" />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#e2e8f0' }}>Jupyter Notebook</h3>
+            </div>
+            {jupyterContents.map((item, i) => (
               <ContentItem key={i} label={item} index={i} />
             ))}
           </div>

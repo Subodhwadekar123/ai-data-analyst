@@ -159,6 +159,7 @@ export const varianceThreshold = (id: string, threshold: number) =>
 
 export const downloadPDFReport = (id: string) => `/api/v1/reports/${id}/pdf`;
 export const downloadExcelReport = (id: string) => `/api/v1/reports/${id}/excel`;
+export const downloadJupyterReport = (id: string) => `/api/v1/reports/${id}/jupyter`;
 
 // ── Health ────────────────────────────────────────────────────────────────
 
