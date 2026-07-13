@@ -39,11 +39,13 @@ def detect_problem(dataset_id: str, target_column: str):
         raise HTTPException(status_code=404, detail="Dataset not found")
 
 
+from app.services.data_service import DataService
+
 @router.post("/ml/{dataset_id}/train", summary="Train Model")
 def train_model(dataset_id: str, req: TrainRequest):
     """Train an ML model and return evaluation metrics."""
     try:
-        return MLService.train_model(
+        res = MLService.train_model(
             dataset_id=dataset_id,
             target_column=req.target_column,
             algorithm=req.algorithm,
@@ -51,6 +53,8 @@ def train_model(dataset_id: str, req: TrainRequest):
             test_size=req.test_size,
             n_clusters=req.n_clusters,
         )
+        DataService.log_action(dataset_id, "ml_train", req.dict())
+        return res
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except FileNotFoundError:

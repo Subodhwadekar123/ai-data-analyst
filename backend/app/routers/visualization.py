@@ -8,15 +8,18 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 from app.services.viz_service import VizService
+from app.services.data_service import DataService
 from app.utils.logger import setup_logger
 
 router = APIRouter()
 logger = setup_logger(__name__)
 
 
-def _handle(func, *args, **kwargs):
+def _handle(action: str, dataset_id: str, params: dict, func, *args, **kwargs):
     try:
-        return func(*args, **kwargs)
+        res = func(*args, **kwargs)
+        DataService.log_action(dataset_id, action, params)
+        return res
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except FileNotFoundError:
@@ -27,86 +30,86 @@ def _handle(func, *args, **kwargs):
 
 @router.get("/viz/{dataset_id}/histogram/{column}")
 def histogram(dataset_id: str, column: str, bins: int = 30):
-    return _handle(VizService.histogram, dataset_id, column, bins)
+    return _handle("viz_histogram", dataset_id, {"column": column, "bins": bins}, VizService.histogram, dataset_id, column, bins)
 
 
 @router.get("/viz/{dataset_id}/bar/{x_col}")
 def bar_chart(dataset_id: str, x_col: str, y_col: Optional[str] = None, top_n: int = 20):
-    return _handle(VizService.bar_chart, dataset_id, x_col, y_col, top_n)
+    return _handle("viz_bar", dataset_id, {"x_col": x_col, "y_col": y_col}, VizService.bar_chart, dataset_id, x_col, y_col, top_n)
 
 
 @router.get("/viz/{dataset_id}/line/{x_col}/{y_col}")
 def line_chart(dataset_id: str, x_col: str, y_col: str):
-    return _handle(VizService.line_chart, dataset_id, x_col, y_col)
+    return _handle("viz_line", dataset_id, {"x_col": x_col, "y_col": y_col}, VizService.line_chart, dataset_id, x_col, y_col)
 
 
 @router.get("/viz/{dataset_id}/scatter/{x_col}/{y_col}")
 def scatter_plot(dataset_id: str, x_col: str, y_col: str, color_col: Optional[str] = None):
-    return _handle(VizService.scatter_plot, dataset_id, x_col, y_col, color_col)
+    return _handle("viz_scatter", dataset_id, {"x_col": x_col, "y_col": y_col, "color_col": color_col}, VizService.scatter_plot, dataset_id, x_col, y_col, color_col)
 
 
 @router.get("/viz/{dataset_id}/box/{column}")
 def box_plot(dataset_id: str, column: str, group_col: Optional[str] = None):
-    return _handle(VizService.box_plot, dataset_id, column, group_col)
+    return _handle("viz_box", dataset_id, {"column": column, "group_col": group_col}, VizService.box_plot, dataset_id, column, group_col)
 
 
 @router.get("/viz/{dataset_id}/pie/{column}")
 def pie_chart(dataset_id: str, column: str, top_n: int = 10):
-    return _handle(VizService.pie_chart, dataset_id, column, top_n)
+    return _handle("viz_pie", dataset_id, {"column": column}, VizService.pie_chart, dataset_id, column, top_n)
 
 
 @router.get("/viz/{dataset_id}/heatmap")
 def correlation_heatmap(dataset_id: str):
-    return _handle(VizService.correlation_heatmap, dataset_id)
+    return _handle("viz_heatmap", dataset_id, {}, VizService.correlation_heatmap, dataset_id)
 
 
 @router.get("/viz/{dataset_id}/area/{x_col}/{y_col}")
 def area_chart(dataset_id: str, x_col: str, y_col: str):
-    return _handle(VizService.area_chart, dataset_id, x_col, y_col)
+    return _handle("viz_area", dataset_id, {"x_col": x_col, "y_col": y_col}, VizService.area_chart, dataset_id, x_col, y_col)
 
 
 @router.get("/viz/{dataset_id}/violin/{column}")
 def violin_plot(dataset_id: str, column: str, group_col: Optional[str] = None):
-    return _handle(VizService.violin_plot, dataset_id, column, group_col)
+    return _handle("viz_violin", dataset_id, {"column": column, "group_col": group_col}, VizService.violin_plot, dataset_id, column, group_col)
 
 
 @router.get("/viz/{dataset_id}/count/{column}")
 def count_plot(dataset_id: str, column: str, hue_col: Optional[str] = None):
-    return _handle(VizService.count_plot, dataset_id, column, hue_col)
+    return _handle("viz_count", dataset_id, {"column": column, "hue_col": hue_col}, VizService.count_plot, dataset_id, column, hue_col)
 
 
 @router.get("/viz/{dataset_id}/timeseries/{date_col}/{value_col}")
 def time_series(dataset_id: str, date_col: str, value_col: str):
-    return _handle(VizService.time_series, dataset_id, date_col, value_col)
+    return _handle("viz_timeseries", dataset_id, {"date_col": date_col, "value_col": value_col}, VizService.time_series, dataset_id, date_col, value_col)
 
 
 @router.get("/viz/{dataset_id}/bubble/{x_col}/{y_col}/{size_col}")
 def bubble_chart(dataset_id: str, x_col: str, y_col: str, size_col: str, color_col: Optional[str] = None):
-    return _handle(VizService.bubble_chart, dataset_id, x_col, y_col, size_col, color_col)
+    return _handle("viz_bubble", dataset_id, {"x_col": x_col, "y_col": y_col, "size_col": size_col}, VizService.bubble_chart, dataset_id, x_col, y_col, size_col, color_col)
 
 
 @router.get("/viz/{dataset_id}/treemap/{label_col}/{value_col}")
 def treemap(dataset_id: str, label_col: str, value_col: str):
-    return _handle(VizService.treemap, dataset_id, label_col, value_col)
+    return _handle("viz_treemap", dataset_id, {"label_col": label_col, "value_col": value_col}, VizService.treemap, dataset_id, label_col, value_col)
 
 
 @router.get("/viz/{dataset_id}/funnel/{stage_col}/{value_col}")
 def funnel(dataset_id: str, stage_col: str, value_col: str):
-    return _handle(VizService.funnel, dataset_id, stage_col, value_col)
+    return _handle("viz_funnel", dataset_id, {"stage_col": stage_col, "value_col": value_col}, VizService.funnel, dataset_id, stage_col, value_col)
 
 
 @router.get("/viz/{dataset_id}/scatter3d/{x_col}/{y_col}/{z_col}")
 def scatter_3d(dataset_id: str, x_col: str, y_col: str, z_col: str, color_col: Optional[str] = None):
-    return _handle(VizService.scatter_3d, dataset_id, x_col, y_col, z_col, color_col)
+    return _handle("viz_scatter_3d", dataset_id, {"x_col": x_col, "y_col": y_col, "z_col": z_col}, VizService.scatter_3d, dataset_id, x_col, y_col, z_col, color_col)
 
 
 @router.get("/viz/{dataset_id}/pairplot")
 def pair_plot(dataset_id: str, columns: Optional[str] = None, max_cols: int = 5):
     cols = columns.split(",") if columns else None
-    return _handle(VizService.pair_plot, dataset_id, cols, max_cols)
+    return _handle("viz_pairplot", dataset_id, {"columns": cols}, VizService.pair_plot, dataset_id, cols, max_cols)
 
 
 @router.get("/viz/{dataset_id}/bubblemap/{location_col}/{size_col}")
 def bubble_map(dataset_id: str, location_col: str, size_col: str):
-    return _handle(VizService.bubble_map, dataset_id, location_col, size_col)
+    return _handle("viz_bubble_map", dataset_id, {"location_col": location_col, "size_col": size_col}, VizService.bubble_map, dataset_id, location_col, size_col)
 

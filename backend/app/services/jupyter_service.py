@@ -52,14 +52,19 @@ class JupyterService:
         # In a real environment, the user would update this path.
         add_code(f"file_path = '{dataset_name}' # Update this path to where your dataset is stored locally.\ndf = pd.read_csv(file_path)\n\n# Display basic information\ndf.info()\ndisplay(df.head())")
 
+        # Separate actions into buckets
+        cleaning_actions = [a for a in ledger if not a['action'].startswith('viz_') and not a['action'].startswith('ml_')]
+        viz_actions = [a for a in ledger if a['action'].startswith('viz_')]
+        ml_actions = [a for a in ledger if a['action'].startswith('ml_')]
+
         # 4. Data Cleaning (From Ledger)
         add_md("## 3. Data Preprocessing & Cleaning\nReplaying the exact cleaning operations performed in the DataMind UI.")
         
         cleaning_code_lines = []
-        if not ledger:
+        if not cleaning_actions:
             cleaning_code_lines.append("# No specific cleaning operations were performed in the UI.")
         
-        for idx, step in enumerate(ledger):
+        for idx, step in enumerate(cleaning_actions):
             action = step["action"]
             p = step["params"]
             cleaning_code_lines.append(f"\n# Step {idx+1}: {action}")
@@ -136,6 +141,136 @@ class JupyterService:
             "    plt.show()"
         )
         add_code(eda_code)
+
+        # 6. Custom Visualizations
+        if viz_actions:
+            add_md("## 5. Custom Visualizations\nReproducing the exact custom charts generated in the DataMind UI.")
+            
+            # Deduplicate by action type + columns to avoid 50 histograms of the same thing
+            seen_viz = set()
+            viz_code_lines = []
+            
+            # Reverse to keep the latest configurations
+            for step in reversed(viz_actions):
+                action = step["action"]
+                p = step["params"]
+                
+                # Create a signature for deduplication
+                cols_sig = "-".join([str(v) for k, v in p.items() if 'col' in k or 'column' in k])
+                sig = f"{action}_{cols_sig}"
+                
+                if sig in seen_viz:
+                    continue
+                seen_viz.add(sig)
+                
+                viz_code_lines.append(f"\n# {action} on {cols_sig}")
+                viz_code_lines.append("plt.figure(figsize=(10, 6))")
+                
+                if action == "viz_histogram":
+                    viz_code_lines.append(f"sns.histplot(data=df, x='{p.get('column')}', bins={p.get('bins', 30)}, kde=True)")
+                elif action == "viz_bar":
+                    if p.get('y_col'):
+                        viz_code_lines.append(f"sns.barplot(data=df, x='{p.get('x_col')}', y='{p.get('y_col')}')")
+                    else:
+                        viz_code_lines.append(f"df['{p.get('x_col')}'].value_counts().head({p.get('top_n', 20)}).plot(kind='bar')")
+                elif action == "viz_scatter":
+                    hue_str = f", hue='{p.get('color_col')}'" if p.get('color_col') else ""
+                    viz_code_lines.append(f"sns.scatterplot(data=df, x='{p.get('x_col')}', y='{p.get('y_col')}'{hue_str})")
+                elif action == "viz_line":
+                    viz_code_lines.append(f"sns.lineplot(data=df, x='{p.get('x_col')}', y='{p.get('y_col')}')")
+                elif action == "viz_box":
+                    if p.get('group_col'):
+                        viz_code_lines.append(f"sns.boxplot(data=df, x='{p.get('group_col')}', y='{p.get('column')}')")
+                    else:
+                        viz_code_lines.append(f"sns.boxplot(data=df, y='{p.get('column')}')")
+                elif action == "viz_pie":
+                    viz_code_lines.append(f"df['{p.get('column')}'].value_counts().head({p.get('top_n', 10)}).plot.pie(autopct='%1.1f%%')\nplt.ylabel('')")
+                elif action == "viz_heatmap":
+                    viz_code_lines.append(f"sns.heatmap(df.select_dtypes(include=np.number).corr(), annot=True, cmap='coolwarm')")
+                elif action == "viz_violin":
+                    if p.get('group_col'):
+                        viz_code_lines.append(f"sns.violinplot(data=df, x='{p.get('group_col')}', y='{p.get('column')}')")
+                    else:
+                        viz_code_lines.append(f"sns.violinplot(data=df, y='{p.get('column')}')")
+                else:
+                    viz_code_lines.append(f"# (Code for {action} omitted in simplified export)")
+                    
+                viz_code_lines.append("plt.title(f'Custom Chart: {action}')")
+                viz_code_lines.append("plt.tight_layout()\nplt.show()")
+                
+            # Reverse back to chronologial order
+            viz_code_lines.reverse()
+            add_code("\n".join(viz_code_lines))
+
+        # 7. Machine Learning Models
+        if ml_actions:
+            add_md("## 6. Modeling & Predictions\nRe-training the machine learning models generated via the UI.")
+            add_code("from sklearn.model_selection import train_test_split\nfrom sklearn.metrics import mean_squared_error, r2_score, accuracy_score, classification_report")
+            
+            seen_ml = set()
+            ml_code_lines = []
+            
+            for step in reversed(ml_actions):
+                p = step["params"]
+                target = p.get('target_column')
+                algo = p.get('algorithm')
+                features = p.get('feature_columns')
+                
+                sig = f"{target}_{algo}_{features}"
+                if sig in seen_ml:
+                    continue
+                seen_ml.add(sig)
+                
+                ml_code_lines.append(f"\n# --- Training {algo} on {target} ---")
+                
+                # Define X and y
+                if features:
+                    ml_code_lines.append(f"X = df[{features}]")
+                else:
+                    ml_code_lines.append(f"X = df.drop(columns=['{target}']).select_dtypes(include=np.number)")
+                    
+                ml_code_lines.append(f"y = df['{target}']")
+                
+                # Train/test split
+                ml_code_lines.append(f"X_train, X_test, y_train, y_test = train_test_split(X, y, test_size={p.get('test_size', 0.2)}, random_state=42)")
+                
+                # Model init
+                if algo == "linear_regression":
+                    ml_code_lines.append("from sklearn.linear_model import LinearRegression\nmodel = LinearRegression()")
+                    is_classification = False
+                elif algo == "random_forest_regressor":
+                    ml_code_lines.append("from sklearn.ensemble import RandomForestRegressor\nmodel = RandomForestRegressor(random_state=42)")
+                    is_classification = False
+                elif algo == "xgboost_regressor":
+                    ml_code_lines.append("from xgboost import XGBRegressor\nmodel = XGBRegressor(random_state=42)")
+                    is_classification = False
+                elif algo == "logistic_regression":
+                    ml_code_lines.append("from sklearn.linear_model import LogisticRegression\nmodel = LogisticRegression(max_iter=1000, random_state=42)")
+                    is_classification = True
+                elif algo == "random_forest_classifier":
+                    ml_code_lines.append("from sklearn.ensemble import RandomForestClassifier\nmodel = RandomForestClassifier(random_state=42)")
+                    is_classification = True
+                elif algo == "xgboost_classifier":
+                    ml_code_lines.append("from xgboost import XGBClassifier\nmodel = XGBClassifier(random_state=42)")
+                    is_classification = True
+                else:
+                    ml_code_lines.append(f"# Algorithm {algo} not explicitly implemented in standard generator. Proceeding as generic.")
+                    ml_code_lines.append("model = None # Add your model here")
+                    is_classification = False
+                
+                # Training
+                ml_code_lines.append("model.fit(X_train, y_train)\ny_pred = model.predict(X_test)")
+                
+                # Evaluation
+                if is_classification:
+                    ml_code_lines.append(f"print('Accuracy:', accuracy_score(y_test, y_pred))")
+                    ml_code_lines.append(f"print(classification_report(y_test, y_pred))")
+                else:
+                    ml_code_lines.append(f"print('MSE:', mean_squared_error(y_test, y_pred))")
+                    ml_code_lines.append(f"print('R2 Score:', r2_score(y_test, y_pred))")
+                    
+            ml_code_lines.reverse()
+            add_code("\n".join(ml_code_lines))
 
         # Build Notebook Dictionary
         notebook = {
