@@ -300,7 +300,7 @@ const AdminPage: React.FC = () => {
                       <th style={{ padding: '12px' }}>Email Address</th>
                       <th style={{ padding: '12px' }}>Role</th>
                       <th style={{ padding: '12px' }}>Status</th>
-                      <th style={{ padding: '12px' }}>Registered Date & Time</th>
+                      <th style={{ padding: '12px' }}>Last Login Date & Time</th>
                       <th style={{ padding: '12px', textAlign: 'center' }}>Actions</th>
                     </tr>
                   </thead>
