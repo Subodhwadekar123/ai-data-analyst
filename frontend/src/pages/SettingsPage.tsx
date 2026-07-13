@@ -15,6 +15,7 @@ import {
   CheckCircle,
   X,
   AlertCircle,
+  Github,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { deleteDataset, reportIssue, downloadIssuesCSV } from '../services/api';
@@ -750,6 +751,38 @@ Generate and customize:
               <ChevronRight size={16} />
             </button>
           ))}
+        </div>
+      </SettingsCard>
+
+      <SettingsCard icon={<Github size={20} color="#e2e8f0" />} iconColor="#cbd5e1" title="Project & Support" delay={0.6}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <p style={{ margin: 0, fontSize: '13.5px', color: '#94a3b8', lineHeight: 1.6 }}>
+            This project is open-source! View the source code, contribute, or star the repository on GitHub.
+          </p>
+          <a
+            href="https://github.com/Subodhwadekar123/ai-data-analyst"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 20px',
+              background: '#24292e',
+              color: '#fff',
+              textDecoration: 'none',
+              borderRadius: '8px',
+              fontWeight: 600,
+              fontSize: '14px',
+              border: '1px solid #3e4451',
+              alignSelf: 'flex-start',
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = '#2f363d'}
+            onMouseLeave={(e) => e.currentTarget.style.background = '#24292e'}
+          >
+            <Github size={18} /> View on GitHub
+          </a>
         </div>
       </SettingsCard>
 

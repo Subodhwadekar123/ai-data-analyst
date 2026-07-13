@@ -49,6 +49,8 @@ export const uploadDataset = (file: File, onProgress?: (pct: number) => void) =>
   });
 };
 
+export const uploadFromUrl = (url: string) => api.post('/upload/url', { url }) as Promise<any>;
+
 export const listDatasets = () => api.get('/datasets') as Promise<any>;
 export const getDataset = (id: string) => api.get(`/datasets/${id}`) as Promise<any>;
 export const getPreview = (id: string, rows = 20) => api.get(`/datasets/${id}/preview?rows=${rows}`) as Promise<any>;

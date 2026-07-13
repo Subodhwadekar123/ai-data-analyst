@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { useStore } from '../store/useStore';
-import { uploadDataset } from '../services/api';
+import { uploadDataset, uploadFromUrl } from '../services/api';
 import DropZone from '../components/upload/DropZone';
 import DataTable from '../components/ui/DataTable';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
@@ -96,6 +96,7 @@ const FormatCard: React.FC<{ ext: string; label: string; color: string; descript
 const UploadPage: React.FC = () => {
   const { isUploading, setIsUploading, uploadProgress, setUploadProgress, addDataset, setActiveDataset } = useStore();
   const [uploadedDataset, setUploadedDataset] = useState<any>(null);
+  const [urlInput, setUrlInput] = useState('');
 
   const handleFileDrop = useCallback(async (file: File) => {
     setIsUploading(true);
@@ -127,6 +128,30 @@ const UploadPage: React.FC = () => {
     }
   }, [setIsUploading, setUploadProgress, addDataset, setActiveDataset]);
 
+  const handleUrlSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!urlInput) return;
+    
+    setIsUploading(true);
+    setUploadProgress(0);
+    setUploadedDataset(null);
+
+    try {
+      const result = await uploadFromUrl(urlInput);
+      setUploadProgress(100);
+      setUploadedDataset(result);
+      addDataset(result as any);
+      setActiveDataset(result as any);
+      setTimeout(() => setIsUploading(false), 300);
+      toast.success('Dataset imported from URL successfully!');
+      setUrlInput('');
+    } catch (err: any) {
+      toast.error(err?.message ?? 'Import failed. Please check the URL and try again.');
+      setIsUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
@@ -154,8 +179,52 @@ const UploadPage: React.FC = () => {
       {/* ------------------------------------------------------------------ */}
       {/* Drop zone                                                           */}
       {/* ------------------------------------------------------------------ */}
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }} style={{ marginBottom: '28px' }}>
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }} style={{ marginBottom: '16px' }}>
         <DropZone onFileDrop={handleFileDrop} isUploading={isUploading} progress={uploadProgress} />
+      </motion.div>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* URL Import                                                          */}
+      {/* ------------------------------------------------------------------ */}
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} style={{ marginBottom: '32px' }}>
+        <form onSubmit={handleUrlSubmit} style={{ display: 'flex', gap: '12px' }}>
+          <input
+            type="url"
+            value={urlInput}
+            onChange={(e) => setUrlInput(e.target.value)}
+            placeholder="Or import from public URL (GitHub Raw, CSV, JSON...)"
+            disabled={isUploading}
+            style={{
+              flex: 1,
+              padding: '12px 16px',
+              borderRadius: '10px',
+              border: '1px solid #2d2f3e',
+              background: '#1a1d27',
+              color: '#e2e8f0',
+              fontSize: '0.95rem',
+              outline: 'none',
+              transition: 'all 0.2s',
+            }}
+            onFocus={(e) => (e.target.style.borderColor = '#6366f1')}
+            onBlur={(e) => (e.target.style.borderColor = '#2d2f3e')}
+          />
+          <button
+            type="submit"
+            disabled={isUploading || !urlInput}
+            style={{
+              padding: '0 24px',
+              borderRadius: '10px',
+              background: isUploading || !urlInput ? '#334155' : '#6366f1',
+              color: '#fff',
+              fontWeight: 600,
+              border: 'none',
+              cursor: isUploading || !urlInput ? 'not-allowed' : 'pointer',
+              transition: 'background 0.2s',
+            }}
+          >
+            Import
+          </button>
+        </form>
       </motion.div>
 
       {/* ------------------------------------------------------------------ */}

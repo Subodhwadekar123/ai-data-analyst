@@ -18,6 +18,8 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import List
+from pydantic import BaseModel
+import httpx
 
 from app.database import get_db, DatasetRecord, UserRecord
 from app.services.data_service import DataService
@@ -29,24 +31,17 @@ from app.routers.auth_deps import get_current_user
 router = APIRouter()
 logger = setup_logger(__name__)
 
+class URLUploadRequest(BaseModel):
+    url: str
 
-@router.post("/upload", summary="Upload Dataset")
-async def upload_dataset(
-    file: UploadFile = File(..., description="CSV or Excel file to analyze"),
-    db: Session = Depends(get_db),
-    current_user: UserRecord = Depends(get_current_user),
+async def _process_dataset(
+    file_content: bytes,
+    original_filename: str,
+    ext: str,
+    current_user: UserRecord,
+    db: Session
 ):
-    """
-    Upload a CSV or Excel file for analysis.
-    
-    - Validates file type, size, and integrity
-    - Saves file with UUID-based name for security
-    - Loads into Pandas DataFrame
-    - Returns dataset metadata and preview
-    """
-    # ── Validate ──────────────────────────────────────────────────────────────
-    ext = await validate_upload_file(file)
-    file_content = await file.read()
+    """Core logic for saving, loading, and recording a dataset."""
     file_size = len(file_content)
 
     # ── Generate unique ID and safe filename ──────────────────────────────────
@@ -74,7 +69,7 @@ async def upload_dataset(
     # ── Save metadata to DB ───────────────────────────────────────────────────
     record = DatasetRecord(
         id=dataset_id,
-        original_filename=file.filename,
+        original_filename=original_filename,
         stored_filename=stored_filename,
         file_path=file_path,
         file_size_bytes=file_size,
@@ -98,14 +93,71 @@ async def upload_dataset(
         "success": True,
         "id": dataset_id,
         "dataset_id": dataset_id,
-        "filename": file.filename,
+        "filename": original_filename,
         "file_size_mb": round(file_size / 1024 / 1024, 2),
         "file_type": ext,
         "dataset_info": dataset_info,
         "preview": preview,
-        "message": f"Successfully uploaded '{file.filename}' ({rows:,} rows × {cols} columns)",
     }
 
+
+@router.post("/upload", summary="Upload Dataset")
+async def upload_dataset(
+    file: UploadFile = File(..., description="CSV or Excel file to analyze"),
+    db: Session = Depends(get_db),
+    current_user: UserRecord = Depends(get_current_user),
+):
+    """
+    Upload a CSV or Excel file for analysis.
+    """
+    # ── Validate ──────────────────────────────────────────────────────────────
+    ext = await validate_upload_file(file)
+    file_content = await file.read()
+    return await _process_dataset(file_content, file.filename, ext, current_user, db)
+
+
+@router.post("/upload/url", summary="Upload Dataset from URL")
+async def upload_dataset_from_url(
+    req: URLUploadRequest,
+    db: Session = Depends(get_db),
+    current_user: UserRecord = Depends(get_current_user),
+):
+    """
+    Fetch a CSV or Excel file from a public URL.
+    """
+    url = req.url
+    if not url.startswith("http://") and not url.startswith("https://"):
+        raise HTTPException(status_code=400, detail="Invalid URL protocol.")
+        
+    # Infer extension from URL or assume CSV
+    ext = "csv"
+    if ".xlsx" in url.lower():
+        ext = "xlsx"
+    elif ".json" in url.lower():
+        ext = "json"
+        
+    original_filename = url.split("/")[-1].split("?")[0]
+    if not original_filename or "." not in original_filename:
+        original_filename = f"dataset.{ext}"
+
+    logger.info(f"Fetching dataset from URL: {url}")
+    try:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            file_content = response.content
+    except httpx.RequestError as e:
+        logger.error(f"Error fetching URL {url}: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed to fetch URL: {e}")
+    except httpx.HTTPStatusError as e:
+        logger.error(f"HTTP error {e.response.status_code} fetching URL {url}")
+        raise HTTPException(status_code=400, detail=f"Failed to fetch URL, server returned {e.response.status_code}")
+        
+    # Add a sanity check for file size (e.g. max 50MB)
+    if len(file_content) > 50 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File from URL is too large (max 50MB).")
+
+    return await _process_dataset(file_content, original_filename, ext, current_user, db)
 
 @router.get("/datasets", summary="List All Datasets")
 def list_datasets(
