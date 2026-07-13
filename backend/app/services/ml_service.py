@@ -186,6 +186,13 @@ class MLService:
 
         if len(X) < 20:
             raise ValueError("Not enough data to train a model (need at least 20 rows)")
+            
+        # Optimization for free-tier deployment timeouts: limit dataset size
+        if len(X) > 5000:
+            logger.info(f"Downsampling from {len(X)} to 5000 rows to prevent timeout.")
+            # Use same random_state to ensure X and y match perfectly
+            X = X.sample(n=5000, random_state=42)
+            y = y.loc[X.index]
 
         # Encode target if classification
         le = None
@@ -221,8 +228,9 @@ class MLService:
         # Cross-validation score
         cv_scores = []
         try:
+            # Reduced cv from 5 to 3 to save computation time
             scoring = "r2" if problem_type == "regression" else "f1_weighted"
-            cv_scores = cross_val_score(model, X, y_encoded, cv=5, scoring=scoring).tolist()
+            cv_scores = cross_val_score(model, X, y_encoded, cv=3, scoring=scoring, n_jobs=-1).tolist()
         except Exception as e:
             logger.warning(f"CV failed: {e}")
 
@@ -249,32 +257,35 @@ class MLService:
     @staticmethod
     def _get_model(algorithm: str):
         """Return a scikit-learn model instance for the given algorithm ID."""
-        models = {
-            # Regression
-            "linear_regression": LinearRegression(),
-            "ridge": Ridge(alpha=1.0),
-            "lasso": Lasso(alpha=0.01, max_iter=10000),
-            "elastic_net": ElasticNet(max_iter=10000),
-            "random_forest_regressor": RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1),
-            "gradient_boosting_regressor": GradientBoostingRegressor(n_estimators=100, random_state=42),
-            "svr": SVR(kernel="rbf"),
-            # Classification
-            "logistic_regression": LogisticRegression(max_iter=1000, random_state=42),
-            "random_forest_classifier": RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1),
-            "decision_tree": DecisionTreeClassifier(max_depth=10, random_state=42),
-            "svm": SVC(probability=True, random_state=42),
-            "naive_bayes": GaussianNB(),
-            "knn": KNeighborsClassifier(n_neighbors=5),
-            "gradient_boosting_classifier": GradientBoostingClassifier(n_estimators=100, random_state=42),
-        }
+        models = {}
+        
+        # Regression
+        models["linear_regression"] = LinearRegression(n_jobs=-1)
+        models["ridge"] = Ridge()
+        models["lasso"] = Lasso()
+        models["elasticnet"] = ElasticNet()
+        
+        # Tree models optimized for speed
+        models["random_forest_regressor"] = RandomForestRegressor(n_estimators=50, max_depth=10, random_state=42, n_jobs=-1)
+        models["gradient_boosting_regressor"] = GradientBoostingRegressor(n_estimators=50, max_depth=5, random_state=42)
+        models["svr"] = SVR(cache_size=500)
+
+        # Classification
+        models["logistic_regression"] = LogisticRegression(max_iter=500, random_state=42, n_jobs=-1)
+        models["random_forest_classifier"] = RandomForestClassifier(n_estimators=50, max_depth=10, random_state=42, n_jobs=-1)
+        models["gradient_boosting_classifier"] = GradientBoostingClassifier(n_estimators=50, max_depth=5, random_state=42)
+        models["decision_tree"] = DecisionTreeClassifier(random_state=42, max_depth=10)
+        models["svc"] = SVC(probability=True, random_state=42, cache_size=500)
+        models["naive_bayes"] = GaussianNB()
+        models["knn"] = KNeighborsClassifier(n_jobs=-1)
 
         if XGBOOST_AVAILABLE:
-            models["xgboost_regressor"] = XGBRegressor(n_estimators=100, random_state=42, verbosity=0)
-            models["xgboost_classifier"] = XGBClassifier(n_estimators=100, random_state=42, verbosity=0, eval_metric="logloss")
+            models["xgboost_regressor"] = XGBRegressor(n_estimators=50, max_depth=5, random_state=42, verbosity=0, n_jobs=-1)
+            models["xgboost_classifier"] = XGBClassifier(n_estimators=50, max_depth=5, random_state=42, verbosity=0, eval_metric="logloss", n_jobs=-1)
 
         if LIGHTGBM_AVAILABLE:
-            models["lightgbm_classifier"] = LGBMClassifier(n_estimators=100, random_state=42, verbose=-1)
-            models["lightgbm_regressor"] = LGBMRegressor(n_estimators=100, random_state=42, verbose=-1)
+            models["lightgbm_classifier"] = LGBMClassifier(n_estimators=50, max_depth=5, random_state=42, verbose=-1, n_jobs=-1)
+            models["lightgbm_regressor"] = LGBMRegressor(n_estimators=50, max_depth=5, random_state=42, verbose=-1, n_jobs=-1)
 
         if algorithm not in models:
             raise ValueError(f"Unknown algorithm: {algorithm}")
