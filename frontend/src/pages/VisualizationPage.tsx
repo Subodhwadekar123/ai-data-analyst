@@ -578,7 +578,7 @@ const VisualizationPage: React.FC = () => {
       </aside>
 
       {/* ── Main chart area ── */}
-      <main style={{ flex: 1, overflow: 'auto', padding: 28, display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <main style={{ flex: 1, minWidth: 0, overflow: 'auto', padding: 28, display: 'flex', flexDirection: 'column', gap: 20 }}>
         {/* Chart header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>

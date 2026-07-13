@@ -107,7 +107,7 @@ export default function CleaningPage() {
         </div>
 
         {/* Right Content - Operation Form & Preview */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', minWidth: 0 }}>
           
           <div className="card" style={{ padding: '24px' }}>
             <h2 style={{ fontSize: '1.2rem', color: '#e2e8f0', marginBottom: '20px' }}>
