@@ -118,6 +118,7 @@ async def list_all_users(
                 "full_name": u.full_name,
                 "is_admin": u.is_admin,
                 "is_online": u.session_token is not None,
+                "last_login": u.last_login,
                 "created_at": u.created_at
             })
         return result
