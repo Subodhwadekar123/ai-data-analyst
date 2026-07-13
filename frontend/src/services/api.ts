@@ -155,11 +155,33 @@ export const featureSelection = (id: string, body: object) =>
 export const varianceThreshold = (id: string, threshold: number) =>
   api.post(`/features/${id}/variance-threshold?threshold=${threshold}`);
 
-// ── Reports ───────────────────────────────────────────────────────────────
+// ── Reports & File Downloads ──────────────────────────────────────────────
 
-export const downloadPDFReport = (id: string) => `/api/v1/reports/${id}/pdf`;
-export const downloadExcelReport = (id: string) => `/api/v1/reports/${id}/excel`;
-export const downloadJupyterReport = (id: string) => `/api/v1/reports/${id}/jupyter`;
+export const triggerBlobDownload = (data: Blob, filename: string) => {
+  const url = window.URL.createObjectURL(data);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};
+
+export const downloadPDFReport = async (id: string) => {
+  const response = await api.get(`/reports/${id}/pdf`, { responseType: 'blob' });
+  triggerBlobDownload(response as unknown as Blob, `datamind_report_${id}.pdf`);
+};
+
+export const downloadExcelReport = async (id: string) => {
+  const response = await api.get(`/reports/${id}/excel`, { responseType: 'blob' });
+  triggerBlobDownload(response as unknown as Blob, `datamind_report_${id}.xlsx`);
+};
+
+export const downloadJupyterReport = async (id: string) => {
+  const response = await api.get(`/reports/${id}/jupyter`, { responseType: 'blob' });
+  triggerBlobDownload(response as unknown as Blob, `datamind_notebook_${id}.ipynb`);
+};
 
 // ── Health ────────────────────────────────────────────────────────────────
 
@@ -196,18 +218,7 @@ export const getAdminIssues = () => api.get('/admin/issues') as Promise<any>;
 export const deleteIssue = (issueId: number) => api.delete(`/admin/issues/${issueId}`) as Promise<any>;
 export const forceLogoutUser = (userId: string) => api.put(`/admin/users/${userId}/force-logout`) as Promise<any>;
 export const getUserDatasets = (userId: string) => api.get(`/admin/users/${userId}/datasets`) as Promise<any>;
-// ── File Downloads ─────────────────────────────────────────────────────────
-
-const triggerBlobDownload = (data: Blob, filename: string) => {
-  const url = window.URL.createObjectURL(data);
-  const link = document.createElement('a');
-  link.href = url;
-  link.setAttribute('download', filename);
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.URL.revokeObjectURL(url);
-};
+// ── Admin File Downloads ───────────────────────────────────────────────────
 
 export const adminDownloadPDF = async (datasetId: string) => {
   const response = await api.get(`/admin/reports/${datasetId}/pdf`, { responseType: 'blob' });

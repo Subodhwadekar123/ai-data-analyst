@@ -226,31 +226,34 @@ const ReportsPage: React.FC = () => {
     );
   }
 
-  const triggerDownload = (url: string, filename: string) => {
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', filename);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+  const handlePDFDownload = async () => {
+    try {
+      toast.loading('Generating PDF...', { id: 'pdf' });
+      await downloadPDFReport(activeDataset.id);
+      toast.success('PDF report downloaded!', { id: 'pdf' });
+    } catch (error) {
+      toast.error('Failed to download PDF', { id: 'pdf' });
+    }
   };
 
-  const handlePDFDownload = () => {
-    const url = downloadPDFReport(activeDataset.id);
-    triggerDownload(url, `datamind_report_${activeDataset.id}.pdf`);
-    toast.success('PDF report download started!');
+  const handleExcelDownload = async () => {
+    try {
+      toast.loading('Generating Excel...', { id: 'excel' });
+      await downloadExcelReport(activeDataset.id);
+      toast.success('Excel report downloaded!', { id: 'excel' });
+    } catch (error) {
+      toast.error('Failed to download Excel', { id: 'excel' });
+    }
   };
 
-  const handleExcelDownload = () => {
-    const url = downloadExcelReport(activeDataset.id);
-    triggerDownload(url, `datamind_report_${activeDataset.id}.xlsx`);
-    toast.success('Excel report download started!');
-  };
-
-  const handleJupyterDownload = () => {
-    const url = downloadJupyterReport(activeDataset.id);
-    triggerDownload(url, `datamind_notebook_${activeDataset.id}.ipynb`);
-    toast.success('Jupyter Notebook generated!');
+  const handleJupyterDownload = async () => {
+    try {
+      toast.loading('Generating Notebook...', { id: 'jupyter' });
+      await downloadJupyterReport(activeDataset.id);
+      toast.success('Jupyter Notebook downloaded!', { id: 'jupyter' });
+    } catch (error) {
+      toast.error('Failed to download Notebook', { id: 'jupyter' });
+    }
   };
 
   const { dataset_info } = activeDataset;
