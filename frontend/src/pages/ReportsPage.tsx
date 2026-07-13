@@ -226,21 +226,30 @@ const ReportsPage: React.FC = () => {
     );
   }
 
+  const triggerDownload = (url: string, filename: string) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
   const handlePDFDownload = () => {
     const url = downloadPDFReport(activeDataset.id);
-    window.open(url, '_blank');
+    triggerDownload(url, `datamind_report_${activeDataset.id}.pdf`);
     toast.success('PDF report download started!');
   };
 
   const handleExcelDownload = () => {
     const url = downloadExcelReport(activeDataset.id);
-    window.open(url, '_blank');
+    triggerDownload(url, `datamind_report_${activeDataset.id}.xlsx`);
     toast.success('Excel report download started!');
   };
 
   const handleJupyterDownload = () => {
     const url = downloadJupyterReport(activeDataset.id);
-    window.open(url, '_blank');
+    triggerDownload(url, `datamind_notebook_${activeDataset.id}.ipynb`);
     toast.success('Jupyter Notebook generated!');
   };
 
