@@ -505,7 +505,7 @@ Generate and customize:
                     <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>
                       {ds.dataset_info.rows.toLocaleString()} rows · {ds.dataset_info.columns} cols ·{' '}
                       {ds.file_size_mb.toFixed(2)} MB ·{' '}
-                      {new Date(ds.uploaded_at).toLocaleDateString()}
+                      {new Date(ds.uploaded_at + (ds.uploaded_at.endsWith('Z') ? '' : 'Z')).toLocaleDateString()}
                     </p>
                   </div>
 

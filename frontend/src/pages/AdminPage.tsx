@@ -149,7 +149,7 @@ const AdminPage: React.FC = () => {
 
   // Format date + time
   const formatDateTime = (dateStr: string) => {
-    const d = new Date(dateStr);
+    const d = new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z');
     return d.toLocaleDateString('en-IN', {
       year: 'numeric', month: 'short', day: 'numeric'
     }) + ' • ' + d.toLocaleTimeString('en-IN', {
@@ -673,7 +673,7 @@ const AdminPage: React.FC = () => {
                           Reporter: <span style={{ color: '#94a3b8' }}>{issue.email || 'Anonymous'}</span>
                         </div>
                         <div>
-                          Date: <span style={{ color: '#94a3b8' }}>{new Date(issue.created_at).toLocaleString()}</span>
+                          Date: <span style={{ color: '#94a3b8' }}>{new Date(issue.created_at + (issue.created_at.endsWith('Z') ? '' : 'Z')).toLocaleString()}</span>
                         </div>
                       </div>
                     </div>
