@@ -126,13 +126,10 @@ export default function LandingPage() {
         padding: '0 32px', height: '64px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{
+          <img src="/logo.jpg" alt="Logo" style={{
             width: 36, height: 36, borderRadius: '10px',
-            background: 'linear-gradient(135deg, #6366f1, #a855f7)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Brain size={20} color="white" />
-          </div>
+            objectFit: 'cover'
+          }} />
           <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'white' }}>Infinitics AI</span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -410,7 +407,7 @@ export default function LandingPage() {
         display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Brain size={20} color="#6366f1" />
+          <img src="/logo.jpg" alt="Logo" style={{ width: 20, height: 20, borderRadius: '6px', objectFit: 'cover' }} />
           <span style={{ fontWeight: 700, color: '#e2e8f0' }}>Infinitics AI</span>
           <span style={{ color: '#374151', margin: '0 8px' }}>|</span>
           <span style={{ color: '#64748b', fontSize: '0.85rem' }}>Upload Your Dataset. Get Professional Insights Instantly.</span>

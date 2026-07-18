@@ -78,7 +78,7 @@ const SplashScreen: React.FC = () => {
               boxShadow: '0 0 30px rgba(99, 102, 241, 0.5)'
             }}
           >
-            <BrainCircuit size={40} color="white" />
+            <img src="/logo.jpg" alt="Infinitics Logo" style={{ width: 40, height: 40, borderRadius: '8px', objectFit: 'cover' }} />
           </motion.div>
         </div>
 

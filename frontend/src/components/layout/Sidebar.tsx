@@ -117,21 +117,18 @@ const Sidebar: React.FC = () => {
         }}
         onClick={() => navigate('/dashboard')}
       >
-        <div
+        <img 
+          src="/logo.jpg" 
+          alt="Infinitics AI Logo" 
           style={{
             width: 36,
             height: 36,
             borderRadius: 10,
-            background: 'linear-gradient(135deg, #6366f1, #a855f7)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
+            objectFit: 'cover',
             boxShadow: '0 0 16px rgba(99,102,241,0.4)',
-          }}
-        >
-          <Brain size={20} color="#fff" />
-        </div>
+            flexShrink: 0
+          }} 
+        />
         <AnimatePresence>
           {!sidebarCollapsed && (
             <motion.div
