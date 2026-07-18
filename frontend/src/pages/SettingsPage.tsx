@@ -237,12 +237,12 @@ const SettingsPage: React.FC = () => {
   };
 
   const downloadDocs = () => {
-    const docsMarkdown = `# DataMind AI - Platform User Guide & Documentation
+    const docsMarkdown = `# Infinitics AI - Platform User Guide & Documentation
 
-Welcome to the DataMind AI documentation. This guide details the features, capabilities, and settings of the DataMind AI platform.
+Welcome to the Infinitics AI documentation. This guide details the features, capabilities, and settings of the Infinitics AI platform.
 
 ## 🚀 1. Getting Started
-DataMind AI is an automated, AI-driven data analyst web application. 
+Infinitics AI is an automated, AI-driven data analyst web application. 
 - **Upload File Size**: Maximum 200 MB.
 - **Supported Formats**: CSV (\`.csv\`), Excel (\`.xlsx\`, \`.xls\`).
 
@@ -280,7 +280,7 @@ Generate and customize:
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'DataMind_AI_Documentation.md';
+    link.download = 'Infinitics_AI_Documentation.md';
     link.click();
     URL.revokeObjectURL(url);
     toast.success('Documentation download started!');
@@ -585,13 +585,13 @@ Generate and customize:
             <Database size={28} color="#fff" />
           </div>
           <div>
-            <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#f1f5f9' }}>DataMind AI</h3>
+            <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#f1f5f9' }}>Infinitics AI</h3>
             <p style={{ margin: '2px 0 0', fontSize: '13px', color: '#64748b' }}>Version 1.0.0</p>
           </div>
         </div>
 
         <p style={{ margin: '0 0 20px', fontSize: '14px', color: '#94a3b8', lineHeight: 1.75 }}>
-          DataMind AI is a powerful, AI-driven data analytics platform that transforms raw datasets into
+          Infinitics AI is a powerful, AI-driven data analytics platform that transforms raw datasets into
           actionable insights. Upload any CSV or Excel file and instantly get statistical analysis, interactive
           visualizations, machine learning models, and conversational AI powered by Google Gemini.
         </p>
@@ -684,7 +684,7 @@ Generate and customize:
                 {/* Content Sections */}
                 <h4 style={{ color: '#e2e8f0', margin: '0 0 6px', fontSize: '14px' }}>🚀 Getting Started</h4>
                 <p style={{ margin: '0 0 16px', fontSize: '13px' }}>
-                  DataMind AI is an automated, AI-driven data analyst dashboard. Upload any CSV or Excel file (up to 200 MB) to get instant descriptive analysis, interactive charts, statistical hypothesis tests, and machine learning predictions.
+                  Infinitics AI is an automated, AI-driven data analyst dashboard. Upload any CSV or Excel file (up to 200 MB) to get instant descriptive analysis, interactive charts, statistical hypothesis tests, and machine learning predictions.
                 </p>
 
                 <h4 style={{ color: '#e2e8f0', margin: '0 0 6px', fontSize: '14px' }}>🧼 Data Cleaning &amp; Imputation</h4>

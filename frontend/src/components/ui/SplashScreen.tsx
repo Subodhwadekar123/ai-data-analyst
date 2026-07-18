@@ -89,7 +89,7 @@ const SplashScreen: React.FC = () => {
           transition={{ delay: 1.2 }}
           style={{ fontSize: '2.5rem', fontWeight: 800, margin: '0 0 16px', letterSpacing: '-0.05em' }}
         >
-          DataMind AI
+          Infinitics AI
         </motion.h1>
         
         <motion.p

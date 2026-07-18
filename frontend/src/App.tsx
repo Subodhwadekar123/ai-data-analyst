@@ -1,5 +1,5 @@
 /**
- * DataMind AI - Main App Component
+ * Infinitics AI - Main App Component
  * Sets up React Router with all pages and the app layout.
  */
 

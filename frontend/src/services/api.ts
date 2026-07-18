@@ -170,17 +170,17 @@ export const triggerBlobDownload = (data: Blob, filename: string) => {
 
 export const downloadPDFReport = async (id: string) => {
   const response = await api.get(`/reports/${id}/pdf`, { responseType: 'blob' });
-  triggerBlobDownload(response as unknown as Blob, `datamind_report_${id}.pdf`);
+  triggerBlobDownload(response as unknown as Blob, `infinitics_report_${id}.pdf`);
 };
 
 export const downloadExcelReport = async (id: string) => {
   const response = await api.get(`/reports/${id}/excel`, { responseType: 'blob' });
-  triggerBlobDownload(response as unknown as Blob, `datamind_report_${id}.xlsx`);
+  triggerBlobDownload(response as unknown as Blob, `infinitics_report_${id}.xlsx`);
 };
 
 export const downloadJupyterReport = async (id: string) => {
   const response = await api.get(`/reports/${id}/jupyter`, { responseType: 'blob' });
-  triggerBlobDownload(response as unknown as Blob, `datamind_notebook_${id}.ipynb`);
+  triggerBlobDownload(response as unknown as Blob, `infinitics_notebook_${id}.ipynb`);
 };
 
 // ── Health ────────────────────────────────────────────────────────────────
