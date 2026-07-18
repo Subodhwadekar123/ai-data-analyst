@@ -124,7 +124,7 @@ def init_db() -> None:
     # Seed admin user if none exists
     db = SessionLocal()
     try:
-        admin_email = "admin@datamind.ai"
+        admin_email = "admin@infinitics.ai"
         exists = db.query(UserRecord).filter(UserRecord.email == admin_email).first()
         import bcrypt
         hashed_pass = bcrypt.hashpw("SubodhW@7116".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
@@ -141,12 +141,12 @@ def init_db() -> None:
             )
             db.add(admin_user)
             db.commit()
-            print("Seeded initial admin user: admin@datamind.ai")
+            print("Seeded initial admin user: admin@infinitics.ai")
         else:
             exists.hashed_password = hashed_pass
             exists.full_name = "System Admin Subodh"
             db.commit()
-            print("Updated admin password and name to matching seed: admin@datamind.ai")
+            print("Updated admin password and name to matching seed: admin@infinitics.ai")
     except Exception as e:
         print(f"Error seeding admin user: {e}")
         db.rollback()

@@ -388,7 +388,7 @@ def download_jupyter_report(dataset_id: str):
         return FileResponse(
             file_path,
             media_type="application/x-ipynb+json",
-            filename="datamind_notebook.ipynb",
+            filename="infinitics_notebook.ipynb",
         )
     except Exception as e:
         logger.error(f"Jupyter export error: {e}", exc_info=True)

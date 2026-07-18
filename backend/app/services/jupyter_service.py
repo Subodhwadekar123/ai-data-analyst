@@ -298,7 +298,7 @@ class JupyterService:
         # Save to file
         reports_dir = settings.REPORTS_DIR
         os.makedirs(reports_dir, exist_ok=True)
-        filename = f"datamind_analysis_{uuid.uuid4().hex[:8]}.ipynb"
+        filename = f"infinitics_analysis_{uuid.uuid4().hex[:8]}.ipynb"
         file_path = os.path.join(reports_dir, filename)
 
         with open(file_path, "w", encoding="utf-8") as f:
