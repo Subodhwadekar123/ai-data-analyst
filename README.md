@@ -1,6 +1,6 @@
-# DataMind AI — Automated AI Data Analyst
+# Infinitics AI — Automated AI Data Analyst
 
-DataMind AI is a production-grade, full-stack data intelligence platform combining automated exploratory data analysis (EDA), automated machine learning (AutoML), interactive charts, and LLM-powered insights.
+Infinitics AI is a production-grade, full-stack data intelligence platform combining automated exploratory data analysis (EDA), automated machine learning (AutoML), interactive charts, and LLM-powered insights.
 
 Built with **FastAPI** (Python) on the backend and **React** (TypeScript) on the frontend, it provides a seamless drag-and-drop workspace for users to extract value from raw CSV and Excel files instantly—no coding required.
 

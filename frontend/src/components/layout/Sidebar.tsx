@@ -152,7 +152,7 @@ const Sidebar: React.FC = () => {
                   letterSpacing: '-0.3px',
                 }}
               >
-                DataMind AI
+                Infinitics AI
               </span>
             </motion.div>
           )}

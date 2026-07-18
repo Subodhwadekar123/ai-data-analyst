@@ -30,7 +30,7 @@ const Header: React.FC = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const pageTitle = routeTitles[location.pathname] ?? 'DataMind AI';
+  const pageTitle = routeTitles[location.pathname] ?? 'Infinitics AI';
 
   // Close dropdown on outside click
   useEffect(() => {

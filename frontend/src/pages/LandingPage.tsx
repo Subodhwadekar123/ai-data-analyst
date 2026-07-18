@@ -1,5 +1,5 @@
 /**
- * Landing Page — DataMind AI
+ * Landing Page — Infinitics AI
  * Stunning hero + features + testimonials + CTA + footer
  */
 
@@ -47,7 +47,7 @@ const TESTIMONIALS = [
     name: 'Dr. Sarah Chen',
     role: 'Data Scientist @ FinTech Corp',
     avatar: 'SC',
-    text: 'DataMind AI replaced my entire EDA workflow. What used to take me 3 hours now takes 3 minutes. The auto-generated insights are surprisingly accurate.',
+    text: 'Infinitics AI replaced my entire EDA workflow. What used to take me 3 hours now takes 3 minutes. The auto-generated insights are surprisingly accurate.',
     rating: 5,
   },
   {
@@ -133,7 +133,7 @@ export default function LandingPage() {
           }}>
             <Brain size={20} color="white" />
           </div>
-          <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'white' }}>DataMind AI</span>
+          <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'white' }}>Infinitics AI</span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <Link
@@ -411,7 +411,7 @@ export default function LandingPage() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Brain size={20} color="#6366f1" />
-          <span style={{ fontWeight: 700, color: '#e2e8f0' }}>DataMind AI</span>
+          <span style={{ fontWeight: 700, color: '#e2e8f0' }}>Infinitics AI</span>
           <span style={{ color: '#374151', margin: '0 8px' }}>|</span>
           <span style={{ color: '#64748b', fontSize: '0.85rem' }}>Upload Your Dataset. Get Professional Insights Instantly.</span>
         </div>
@@ -434,7 +434,7 @@ export default function LandingPage() {
           ))}
         </div>
         <p style={{ color: '#374151', fontSize: '0.8rem' }}>
-          © 2024 DataMind AI. Built with FastAPI + React + ❤️
+          © 2024 Infinitics AI. Built with FastAPI + React + ❤️
         </p>
       </footer>
 
