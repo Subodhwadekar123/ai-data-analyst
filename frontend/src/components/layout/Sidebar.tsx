@@ -125,6 +125,7 @@ const Sidebar: React.FC = () => {
             height: 36,
             borderRadius: 10,
             objectFit: 'cover',
+            mixBlendMode: 'screen',
             boxShadow: '0 0 16px rgba(99,102,241,0.4)',
             flexShrink: 0
           }} 
