@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { path: '/admin/activity', icon: <Activity size={18} />, label: 'Login Activity' },
   { path: '/admin/sessions', icon: <Monitor size={18} />, label: 'Sessions' },
   { path: '/admin/audit', icon: <FileText size={18} />, label: 'Audit Logs' },
+  { path: '/admin/properties', icon: <Database size={18} />, label: 'Properties Data' },
 ];
 
 const AdminLayout: React.FC = () => {

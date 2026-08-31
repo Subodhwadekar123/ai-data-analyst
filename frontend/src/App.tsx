@@ -45,6 +45,8 @@ import AdminUsersPage from './pages/admin/AdminUsersPage';
 import AdminActivityPage from './pages/admin/AdminActivityPage';
 import AdminSessionsPage from './pages/admin/AdminSessionsPage';
 import AdminAuditLogsPage from './pages/admin/AdminAuditLogsPage';
+import AdminPropertiesPage from './pages/admin/AdminPropertiesPage';
+import PropertyChatPage from './pages/user/PropertyChatPage';
 
 function App() {
   const [showSplash, setShowSplash] = useState(() => {
@@ -107,6 +109,7 @@ function App() {
             <Route path="activity" element={<AdminActivityPage />} />
             <Route path="sessions" element={<AdminSessionsPage />} />
             <Route path="audit" element={<AdminAuditLogsPage />} />
+            <Route path="properties" element={<AdminPropertiesPage />} />
           </Route>
         </Route>
 
@@ -133,6 +136,7 @@ function App() {
             <Route path="reports" element={<ReportsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="profile" element={<ProfilePage />} />
+            <Route path="property-chat" element={<PropertyChatPage />} />
           </Route>
         </Route>
 

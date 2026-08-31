@@ -21,6 +21,7 @@ import {
   LogOut,
   Shield,
   User,
+  MessageSquare,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { logoutUser } from '../../services/authApi';
@@ -61,6 +62,7 @@ const navSections: NavSection[] = [
       { icon: <Brain size={17} />, label: 'AutoML Studio', path: '/dashboard/ml' },
       { icon: <Database size={17} />, label: 'SQL Workplace', path: '/dashboard/sql' },
       { icon: <Sparkles size={17} />, label: 'AI Executive Brief', path: '/dashboard/ai-insights' },
+      { icon: <MessageSquare size={17} />, label: 'Property AI Chat', path: '/dashboard/property-chat' },
     ],
   },
   {

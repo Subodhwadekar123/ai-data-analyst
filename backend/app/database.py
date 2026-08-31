@@ -440,6 +440,44 @@ def init_db() -> None:
         db.close()
 
 
+class PropertyRecord(Base):
+    """Stores metadata and details about uploaded real-estate properties."""
+    __tablename__ = "properties"
+
+    id = Column(String, primary_key=True, index=True)
+    property_id = Column(String, nullable=True, index=True)
+    property_name = Column(String, nullable=True)
+    location = Column(String, nullable=True, index=True)
+    city = Column(String, nullable=True, index=True)
+    property_type = Column(String, nullable=True)
+    bhk = Column(Integer, nullable=True, index=True)
+    price = Column(Float, nullable=True, index=True)
+    price_per_sq_ft = Column(Float, nullable=True)
+    area_sq_ft = Column(Float, nullable=True, index=True)
+    furnishing = Column(String, nullable=True)
+    parking = Column(String, nullable=True)
+    amenities = Column(String, nullable=True)
+    status = Column(String, nullable=True)
+    dealer_name = Column(String, nullable=True)
+    agent_name = Column(String, nullable=True)
+    contact_number = Column(String, nullable=True)
+    email = Column(String, nullable=True)
+    property_url = Column(String, nullable=True)
+    raw_data = Column(Text, nullable=True)  # JSON dump of original columns
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class PropertyMetadata(Base):
+    """Stores metadata about the current uploaded property dataset."""
+    __tablename__ = "properties_metadata"
+
+    id = Column(String, primary_key=True, default="current_dataset")
+    filename = Column(String, nullable=False)
+    row_count = Column(Integer, default=0)
+    uploaded_by = Column(String, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 # ── Dependency Injection ──────────────────────────────────────────────────────
 def get_db() -> Generator[Session, None, None]:
     """FastAPI dependency to get a database session."""

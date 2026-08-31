@@ -43,6 +43,8 @@ from app.routers import (
     auth,
     admin,
     sql,
+    admin_properties,
+    chatbot,
 )
 
 # ── Logger Setup ─────────────────────────────────────────────────────────────
@@ -167,6 +169,8 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix=API_PREFIX, tags=["Authentication"])
     app.include_router(admin.router, prefix=API_PREFIX, tags=["Administration"])
     app.include_router(sql.router, prefix=API_PREFIX, tags=["SQL"])
+    app.include_router(admin_properties.router, prefix=API_PREFIX, tags=["Administration"])
+    app.include_router(chatbot.router, prefix=API_PREFIX, tags=["Chatbot"])
 
     # ── Root & Utility Endpoints ──────────────────────────────────────────────
     @app.get("/", tags=["Root"], summary="API Root Status")
