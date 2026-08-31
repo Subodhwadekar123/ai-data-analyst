@@ -19,8 +19,6 @@ from app.routers import (
     auth,
     admin,
     sql,
-    admin_properties,
-    chatbot,
 )
 
 __all__ = [
@@ -38,6 +36,4 @@ __all__ = [
     "auth",
     "admin",
     "sql",
-    "admin_properties",
-    "chatbot",
 ]
