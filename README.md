@@ -120,9 +120,7 @@ Open your browser and visit: **`http://localhost:3000`**
 ## 🔑 Default Credentials (Seeded for Testing)
 
 ### 👑 System Administrator:
-* **Email**: `admin@infinitics.ai`
-* **Password**: `SubodhW@7116`
-* **Role**: Admin (`/admin`)
+
 
 *(You can also use the **"Auto-Fill Admin"** or **"Auto-Fill User"** buttons on the Login page for instant one-click login).*
 

@@ -586,7 +586,20 @@ class MLService:
 
         grid = param_grids.get(algorithm)
         if not grid:
-            return {"tuned": False, "message": "Hyperparameter tuning is not supported for this algorithm. Retrained default."}
+            default_res = MLService.train_model_v2(
+                dataset_id=dataset_id,
+                target_column=target_column,
+                algorithm=algorithm,
+                feature_columns=feature_columns,
+                test_size=test_size,
+                scaling_method=scaling_method,
+                imputation_strategy=imputation_strategy,
+                stratify_split=stratify_split,
+                categorical_encoding=categorical_encoding,
+            )
+            default_res["tuned"] = False
+            default_res["message"] = "Hyperparameter tuning is not supported for this algorithm. Retrained default."
+            return default_res
 
         default_res = MLService.train_model_v2(
             dataset_id=dataset_id,
