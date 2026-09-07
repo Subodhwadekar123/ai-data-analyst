@@ -339,6 +339,43 @@ def _add_column_if_missing(conn, table: str, column: str, col_type: str):
         pass   # Column already exists
 
 
+def _ensure_user_columns(engine):
+    """
+    Idempotently repair the `users` table so it matches the current UserRecord model.
+    Tables created by older builds are missing newer auth columns (username, profile_picture_url,
+    role, etc.) and create_all() will NOT add them. Here we introspect the live schema and
+    ALTER-add whatever the model defines but the DB lacks, logging errors instead of swallowing them.
+    """
+    from sqlalchemy import inspect, text
+    try:
+        insp = inspect(engine)
+        existing = {c["name"] for c in insp.get_columns("users")}
+        missing = [c for c in UserRecord.__table__.columns if c.name not in existing]
+        if not missing:
+            return
+        names = ", ".join(c.name for c in missing)
+        print(f"[MIGRATION] users table missing columns: {names}")
+        dialect = engine.dialect
+        with engine.begin() as conn:
+            for col in missing:
+                type_sql = col.type.compile(dialect=dialect)
+                default_sql = ""
+                dflt = col.default
+                if dflt is not None and isinstance(dflt.arg, (bool, int, float, str)):
+                    if isinstance(dflt.arg, str):
+                        default_sql = f" DEFAULT '{dflt.arg}'"
+                    else:
+                        default_sql = f" DEFAULT {dflt.arg}"
+                stmt = f"ALTER TABLE users ADD COLUMN {col.name} {type_sql}{default_sql}"
+                try:
+                    conn.execute(text(stmt))
+                    print(f"  [OK] Added users.{col.name}")
+                except Exception as e:
+                    print(f"  [WARNING] Could not add users.{col.name}: {e}")
+    except Exception as e:
+        print(f"[WARNING] users schema repair check skipped: {e}")
+
+
 def init_db() -> None:
     """Create all database tables and run migrations on existing databases with retry logic."""
     import time
@@ -381,6 +418,10 @@ def init_db() -> None:
         ]
         for table, col, col_type in migrations:
             _add_column_if_missing(conn, table, col, col_type)
+
+    # Robust repair: ensure every column the model expects actually exists
+    # (fixes the "column users.username does not exist" 500 on pre-existing DBs).
+    _ensure_user_columns(engine)
 
     # Seed initial admin & demo user accounts
     db = SessionLocal()

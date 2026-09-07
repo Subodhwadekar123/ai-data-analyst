@@ -13,7 +13,7 @@
  *   Then redeploy. Vite bakes env vars at build time.
  */
 
-const PRODUCTION_BACKEND_FALLBACK = 'https://ai-data-analyst-backend-production-df70.up.railway.app';
+const PRODUCTION_BACKEND_FALLBACK = 'https://datamind-backend-tmql.onrender.com';
 
 const appendApiPrefix = (url: string): string => {
   let clean = url.trim().replace(/\/+$/, '');
