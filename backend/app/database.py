@@ -33,7 +33,18 @@ db_url = settings.DATABASE_URL
 if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
 
-connect_args = {"check_same_thread": False} if "sqlite" in db_url else {}
+if "sqlite" in db_url:
+    connect_args = {"check_same_thread": False}
+elif "pyodbc" in db_url:
+    # Fail fast (seconds, not minutes) when the SQL Server host is unreachable
+    # (e.g. on cloud deploys like Render). Stops startup from hanging forever.
+    connect_args = {"timeout": 10}
+elif "postgresql" in db_url:
+    connect_args = {"connect_timeout": 10}
+elif "mysql" in db_url:
+    connect_args = {"connect_timeout": 10}
+else:
+    connect_args = {}
 
 engine = create_engine(
     db_url,
@@ -343,7 +354,8 @@ def init_db() -> None:
         except Exception as e:
             if attempt == max_retries:
                 print(f"[ERROR] Database initialization failed after {max_retries} attempts: {e}")
-                raise e
+                print("[WARNING] Continuing startup WITHOUT a database connection. Verify DATABASE_URL is set and reachable from this host.")
+                return
             print(f"[WARNING] Database connection failed, retrying in {retry_delay}s... Error: {e}")
             time.sleep(retry_delay)
 

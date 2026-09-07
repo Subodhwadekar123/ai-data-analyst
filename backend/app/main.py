@@ -57,8 +57,12 @@ async def lifespan(app: FastAPI):
     logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
     logger.info(f"Upload directory: {settings.UPLOAD_DIR}")
     logger.info(f"Reports directory: {settings.REPORTS_DIR}")
-    init_db()
-    logger.info("Database initialized")
+    try:
+        init_db()
+        logger.info("Database initialized")
+    except Exception as exc:
+        # Never block the web server from booting if the DB is unreachable.
+        logger.error(f"Database initialization failed - continuing without DB: {exc}")
     yield
     # Shutdown
     logger.info("Shutting down AI Data Analyst")
