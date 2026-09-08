@@ -479,33 +479,7 @@ def init_db() -> None:
             admin_exists.role = "admin"
             print("[OK] Updated admin credentials: admin@infinitics.ai")
 
-        # 2. Standard Demo User Account
-        demo_email = "user@infinitics.ai"
-        demo_password = "UserPass@123"
-        hashed_demo_pass = bcrypt.hashpw(demo_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-
-        demo_exists = db.query(UserRecord).filter(UserRecord.email == demo_email).first()
-        if not demo_exists:
-            demo_user = UserRecord(
-                id=str(uuid.uuid4()),
-                email=demo_email,
-                hashed_password=hashed_demo_pass,
-                full_name="Demo Analyst",
-                username="demo_analyst",
-                is_active=True,
-                is_admin=False,
-                is_verified=True,
-                role="user",
-            )
-            db.add(demo_user)
-            print("[OK] Seeded demo analyst user: user@infinitics.ai")
-        else:
-            demo_exists.hashed_password = hashed_demo_pass
-            demo_exists.full_name = "Demo Analyst"
-            demo_exists.is_admin = False
-            demo_exists.is_verified = True
-            demo_exists.role = "user"
-            print("[OK] Updated demo user credentials: user@infinitics.ai")
+        # Demo user removed — start with clean slate, only admin is seeded
 
         db.commit()
     except Exception as e:
