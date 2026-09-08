@@ -908,3 +908,33 @@ async def delete_issue(
     db.delete(issue)
     db.commit()
     return {"message": "Issue deleted."}
+
+
+# ── TEMPORARY: Mark all users as unverified (remove after use) ──────────────
+
+@router.post("/debug/mark-all-unverified", summary="[TEMP] Mark all users unverified")
+async def mark_all_unverified(
+    db: Session = Depends(get_db),
+    admin: UserRecord = Depends(get_current_admin),
+):
+    """TEMPORARY: Marks every user as unverified so OTP flow can be tested.
+    Remove this endpoint after use."""
+    count = db.query(UserRecord).filter(UserRecord.is_verified == True).update({"is_verified": False})
+    db.commit()
+    return {"message": f"Marked {count} users as unverified."}
+
+
+@router.delete("/debug/delete-all-users-except-admin", summary="[TEMP] Delete all non-admin users")
+async def delete_all_except_admin(
+    db: Session = Depends(get_db),
+    admin: UserRecord = Depends(get_current_admin),
+):
+    """TEMPORARY: Deletes all users except admin@infinitics.ai."""
+    # Delete related data first
+    db.query(OTPChallenge).delete(synchronize_session=False)
+    db.query(LoginHistory).filter(LoginHistory.user_id != admin.id).delete(synchronize_session=False)
+    db.query(RefreshTokenRecord).filter(RefreshTokenRecord.user_id != admin.id).delete(synchronize_session=False)
+    db.query(SessionRecord).filter(SessionRecord.user_id != admin.id).delete(synchronize_session=False)
+    deleted = db.query(UserRecord).filter(UserRecord.id != admin.id).delete(synchronize_session=False)
+    db.commit()
+    return {"message": f"Deleted {deleted} users. Only admin@infinitics.ai remains."}
