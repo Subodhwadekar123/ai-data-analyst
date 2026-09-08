@@ -449,7 +449,7 @@ export default function VisualizationPage() {
             </span>
           </div>
           <p style={{ margin: '3px 0 0 0', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
-            Workspace: <strong style={{ color: 'var(--text-primary)' }}>{activeDataset.filename}</strong> ({activeDataset.dataset_info.rows.toLocaleString()} rows × {activeDataset.dataset_info.columns} cols)
+            Workspace: <strong style={{ color: 'var(--text-primary)' }}>{activeDataset.filename}</strong> ({activeDataset.dataset_info?.rows?.toLocaleString() ?? '—'} rows × {activeDataset.dataset_info?.columns ?? '—'} cols)
           </p>
         </div>
 

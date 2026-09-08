@@ -114,15 +114,15 @@ export default function CleaningPage() {
     }
   };
 
-  if (!activeDataset) return <EmptyState />;
-
-  const numericCols = activeDataset.dataset_info.column_types.numeric || [];
-  const catCols = activeDataset.dataset_info.column_types.categorical || [];
+  const datasetInfo = (activeDataset?.dataset_info ?? {}) as any;
+  const colTypes = (datasetInfo.column_types ?? {}) as any;
+  const numericCols = colTypes.numeric || [];
+  const catCols = colTypes.categorical || [];
   const allCols = [
     ...numericCols, 
     ...catCols, 
-    ...(activeDataset.dataset_info.column_types.datetime || []), 
-    ...(activeDataset.dataset_info.column_types.boolean || [])
+    ...(colTypes.datetime || []), 
+    ...(colTypes.boolean || [])
   ];
 
   const handleUndo = async () => {
@@ -197,6 +197,8 @@ export default function CleaningPage() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undoCount, undoing, loading, activeDataset?.id]);
+
+  if (!activeDataset) return <EmptyState />;
 
   const handleReset = async () => {
     const currentId = activeDataset?.id;
@@ -449,13 +451,13 @@ export default function CleaningPage() {
 
                 <div style={{ background: 'var(--bg-canvas)', padding: '14px', borderRadius: '8px', border: '1px solid var(--border-default)', marginTop: '6px' }}>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', margin: '0 0 6px', fontWeight: 700, textTransform: 'uppercase' }}>Missing values telemetry:</p>
-                  {Object.entries(activeDataset.dataset_info.missing_info).map(([col, info]: [string, any]) => (
+                  {Object.entries(activeDataset.dataset_info?.missing_info ?? {}).map(([col, info]: [string, any]) => (
                     <div key={col} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', marginBottom: '3px' }}>
                       <span style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-family-mono)' }}>{col}</span>
                       <span style={{ color: 'var(--accent-amber)', fontFamily: 'var(--font-family-mono)' }}>{info.count} missing ({info.percentage.toFixed(1)}%)</span>
                     </div>
                   ))}
-                  {Object.keys(activeDataset.dataset_info.missing_info).length === 0 && (
+                  {Object.keys(activeDataset.dataset_info?.missing_info ?? {}).length === 0 && (
                     <span style={{ color: 'var(--color-success)', fontSize: '0.8rem', fontWeight: 600 }}>✓ Zero missing values detected in active workspace</span>
                   )}
                 </div>
@@ -466,11 +468,11 @@ export default function CleaningPage() {
             {activeTab === 'duplicates' && (
               <div>
                 <p style={{ color: 'var(--text-secondary)', marginBottom: '16px', fontSize: '0.88rem' }}>
-                  Dataset contains <strong style={{ color: 'var(--text-primary)' }}>{activeDataset.dataset_info.duplicate_rows}</strong> duplicate rows ({activeDataset.dataset_info.duplicate_percentage}%).
+                  Dataset contains <strong style={{ color: 'var(--text-primary)' }}>{activeDataset.dataset_info?.duplicate_rows ?? 0}</strong> duplicate rows ({activeDataset.dataset_info?.duplicate_percentage ?? 0}%).
                 </p>
                 <button 
                   className="btn-primary"
-                  disabled={loading || activeDataset.dataset_info.duplicate_rows === 0}
+                  disabled={loading || activeDataset.dataset_info?.duplicate_rows === 0}
                   onClick={() => handleCleanAction(() => removeDuplicates(activeDataset.id), 'Duplicate rows purged')}
                 >
                   Purge Duplicate Rows
@@ -828,7 +830,7 @@ export default function CleaningPage() {
                 Cleaned Data Preview
               </h3>
               <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontFamily: 'var(--font-family-mono)' }}>
-                {activeDataset.dataset_info.rows} rows × {activeDataset.dataset_info.columns} columns
+                {activeDataset.dataset_info?.rows ?? '—'} rows × {activeDataset.dataset_info?.columns ?? '—'} columns
               </span>
             </div>
 

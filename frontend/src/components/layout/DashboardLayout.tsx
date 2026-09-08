@@ -8,6 +8,7 @@ import InteractiveBackground from './InteractiveBackground';
 import { useStore } from '../../store/useStore';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { listDatasets, getDataset } from '../../services/api';
+import ErrorBoundary from '../ui/ErrorBoundary';
 
 const DashboardLayout: React.FC = () => {
   const { sidebarCollapsed, datasets, activeDataset, addDataset, setActiveDataset, setSidebarCollapsed } = useStore();
@@ -153,7 +154,9 @@ const DashboardLayout: React.FC = () => {
               transition={{ duration: 0.2, ease: 'easeOut' }}
               style={{ minHeight: '100%' }}
             >
-              <Outlet />
+              <ErrorBoundary key={location.pathname}>
+                <Outlet />
+              </ErrorBoundary>
             </motion.div>
           </AnimatePresence>
         </main>

@@ -16,6 +16,7 @@ import {
 import { useStore } from '../../store/useStore';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { logoutUser } from '../../services/authApi';
+import ErrorBoundary from '../../components/ui/ErrorBoundary';
 
 const NAV_ITEMS = [
   { path: '/admin/dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
@@ -447,7 +448,9 @@ const AdminLayout: React.FC = () => {
 
         {/* Page Content */}
         <main style={{ flex: 1, overflow: 'auto', padding: isMobile ? '16px 12px' : '24px 28px' }}>
-          <Outlet />
+          <ErrorBoundary key={location.pathname}>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
     </div>
