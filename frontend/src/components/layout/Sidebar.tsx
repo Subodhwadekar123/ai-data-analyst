@@ -399,7 +399,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onClose }) => {
                 flexShrink: 0,
               }}
             >
-              {user.full_name ? user.full_name[0].toUpperCase() : user.email[0].toUpperCase()}
+              {(user.full_name || user.email || 'U')[0].toUpperCase()}
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div
@@ -423,7 +423,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onClose }) => {
                   whiteSpace: 'nowrap',
                 }}
               >
-                {user.email}
+                {user.email ?? 'No email'}
               </div>
             </div>
           </div>

@@ -68,6 +68,7 @@ function App() {
 
   return (
     <HashRouter>
+      <ErrorBoundary>
       <Toaster
         position="top-center"
         toastOptions={{
@@ -139,6 +140,7 @@ function App() {
         {/* ── Fallback ───────────────────────────────────────────── */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </ErrorBoundary>
     </HashRouter>
   );
 }
