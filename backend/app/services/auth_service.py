@@ -86,17 +86,19 @@ def register_user(
         )
 
     # Create user
-    auto_verify = getattr(settings, "AUTO_VERIFY_USERS", False)
+    # Admin email skips OTP; all other emails require OTP verification
+    _is_admin_email = email.lower().strip() == "admin@infinitics.ai"
+    auto_verify = _is_admin_email or getattr(settings, "AUTO_VERIFY_USERS", False)
     user = UserRecord(
         id=str(uuid.uuid4()),
         email=email.lower().strip(),
         username=username,
         full_name=full_name,
         hashed_password=hash_password(password),
-        role="user",
-        is_admin=False,
+        role="admin" if _is_admin_email else "user",
+        is_admin=_is_admin_email,
         is_active=True,
-        is_verified=auto_verify,   # Auto-verify in development if enabled
+        is_verified=auto_verify,
     )
     db.add(user)
     db.commit()
@@ -335,8 +337,8 @@ def login_user(
         _handle_failed_attempt(db, user, ip_address, device_info)
         raise auth_error
 
-    # Check email verification
-    if not user.is_verified:
+    # Check email verification (admin@infinitics.ai skips OTP)
+    if not user.is_verified and email != "admin@infinitics.ai":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Please verify your email address before logging in. Check your inbox.",
