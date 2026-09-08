@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, ArrowLeft, Loader2, AlertCircle, CheckCircle, Key } from 'lucide-react';
-import { requestPasswordReset } from '../../services/authApi';
+import { forgotPassword } from '../../services/authApi';
 import InteractiveBackground from '../../components/layout/InteractiveBackground';
 
 const ForgotPasswordPage: React.FC = () => {

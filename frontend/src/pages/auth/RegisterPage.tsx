@@ -348,4 +348,19 @@ const blobStyle2: React.CSSProperties = {
   filter: 'blur(50px)', pointerEvents: 'none',
 };
 
+const labelStyle: React.CSSProperties = {
+  display: 'block', fontSize: '12px', color: '#64748b', fontWeight: 600,
+  marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.06em',
+};
+
+const inputStyle: React.CSSProperties = {
+  width: '100%', padding: '11px 14px', background: 'var(--bg-canvas)',
+  border: '1px solid var(--border-default)', borderRadius: '10px', color: 'var(--text-primary)',
+  fontSize: '14px', outline: 'none', boxSizing: 'border-box',
+};
+
+const iconStyle: React.CSSProperties = {
+  position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
+};
+
 export default RegisterPage;

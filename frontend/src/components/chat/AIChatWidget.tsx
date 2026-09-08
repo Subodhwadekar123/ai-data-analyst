@@ -352,6 +352,7 @@ const CodeMessage: React.FC<{ content: string; errors?: CodeIssue[]; fixedCode?:
 
 const AIChatWidget: React.FC = () => {
   const { activeDataset, chatHistory, addChatMessage, clearChat } = useStore();
+  const isMobile = useIsMobile();
 
   const [isOpen, setIsOpen] = useState(false);
   const [chatInput, setChatInput] = useState('');
