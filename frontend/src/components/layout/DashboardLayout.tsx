@@ -6,11 +6,14 @@ import Header from './Header';
 import AIChatWidget from '../chat/AIChatWidget';
 import InteractiveBackground from './InteractiveBackground';
 import { useStore } from '../../store/useStore';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import { listDatasets, getDataset } from '../../services/api';
 
 const DashboardLayout: React.FC = () => {
-  const { sidebarCollapsed, datasets, activeDataset, addDataset, setActiveDataset } = useStore();
+  const { sidebarCollapsed, datasets, activeDataset, addDataset, setActiveDataset, setSidebarCollapsed } = useStore();
   const location = useLocation();
+  const isMobile = useIsMobile();
+  const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
 
   React.useEffect(() => {
     const syncDatasets = async () => {
@@ -66,7 +69,22 @@ const DashboardLayout: React.FC = () => {
     syncDatasets();
   }, []); // Run once on layout mount
 
-  const mainMarginLeft = sidebarCollapsed ? 64 : 230;
+  // Close mobile nav on route change
+  React.useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
+
+  // Prevent body scroll when mobile nav is open
+  React.useEffect(() => {
+    if (mobileNavOpen && isMobile) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [mobileNavOpen, isMobile]);
+
+  const mainMarginLeft = isMobile ? 0 : (sidebarCollapsed ? 64 : 230);
 
   return (
     <div
@@ -84,8 +102,17 @@ const DashboardLayout: React.FC = () => {
       {/* Interactive Background Canvas */}
       <InteractiveBackground />
 
+      {/* Mobile Sidebar Backdrop */}
+      {isMobile && (
+        <div
+          className={`sidebar-backdrop ${mobileNavOpen ? 'open' : ''}`}
+          onClick={() => setMobileNavOpen(false)}
+          style={{ cursor: 'pointer' }}
+        />
+      )}
+
       {/* Sidebar Navigation */}
-      <Sidebar />
+      <Sidebar mobileOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
 
       {/* Main Content Workspace */}
       <motion.div
@@ -99,10 +126,11 @@ const DashboardLayout: React.FC = () => {
           position: 'relative',
           zIndex: 1,
           overflow: 'hidden',
+          width: isMobile ? '100%' : undefined,
         }}
       >
         {/* Header Bar */}
-        <Header />
+        <Header onMenuToggle={() => setMobileNavOpen(!mobileNavOpen)} />
 
         {/* Floating AI Assistant (global overlay) */}
         <AIChatWidget />
@@ -111,7 +139,7 @@ const DashboardLayout: React.FC = () => {
         <main
           style={{
             flex: 1,
-            padding: '24px 28px',
+            padding: isMobile ? '16px 14px' : '24px 28px',
             overflowY: 'auto',
             overflowX: 'hidden',
           }}

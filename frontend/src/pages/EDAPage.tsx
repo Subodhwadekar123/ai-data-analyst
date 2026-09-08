@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store/useStore';
+import { useIsMobile } from '../hooks/useMediaQuery';
 import { getFullEDA } from '../services/api';
 import SectionHeader from '../components/ui/SectionHeader';
 import EmptyState from '../components/ui/EmptyState';
@@ -9,6 +10,7 @@ import { Activity, BarChart2, TrendingUp, AlertTriangle, Layers, CheckCircle2 } 
 
 export default function EDAPage() {
   const { activeDataset } = useStore();
+  const isMobile = useIsMobile();
   const [edaData, setEdaData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'summary' | 'distributions' | 'correlations' | 'missing' | 'outliers'>('summary');
@@ -116,7 +118,7 @@ export default function EDAPage() {
 
             {/* SUMMARY TAB */}
             {activeTab === 'summary' && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '18px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(320px, 1fr))', gap: '18px' }}>
 
                 {/* Data Quality Card */}
                 <div className="card-precision" style={{ padding: '20px' }}>
@@ -366,7 +368,7 @@ export default function EDAPage() {
                 </h3>
 
                 {edaData?.missing_values && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px', marginBottom: '20px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px', marginBottom: '20px' }}>
                     {[
                       { label: 'Total Nulls', value: edaData.missing_values.total_missing_values ?? 0 },
                       { label: 'Overall Null %', value: `${edaData.missing_values.overall_missing_percentage ?? 0}%` },
@@ -429,7 +431,7 @@ export default function EDAPage() {
 
             {/* OUTLIERS TAB */}
             {activeTab === 'outliers' && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(360px, 1fr))', gap: '16px' }}>
                 {outlierDetails.length > 0 ? (
                   outlierDetails.map((item: any) => (
                     <div key={item.column} className="card-precision" style={{ padding: '18px' }}>

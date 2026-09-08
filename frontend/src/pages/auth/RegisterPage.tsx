@@ -17,10 +17,12 @@ import {
 } from 'lucide-react';
 import { registerUser, resendVerification } from '../../services/authApi';
 import PasswordStrengthMeter from '../../components/auth/PasswordStrengthMeter';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import InteractiveBackground from '../../components/layout/InteractiveBackground';
 
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [formData, setFormData] = useState({
     full_name: '',
     username: '',
@@ -344,27 +346,6 @@ const blobStyle2: React.CSSProperties = {
   position: 'absolute', bottom: '10%', left: '10%', width: '300px', height: '300px',
   background: 'radial-gradient(circle, rgba(168,85,247,0.10) 0%, transparent 70%)',
   filter: 'blur(50px)', pointerEvents: 'none',
-};
-
-const cardStyle: React.CSSProperties = {
-  background: 'rgba(22,25,37,0.8)', backdropFilter: 'blur(20px)',
-  border: '1px solid rgba(255,255,255,0.08)', borderRadius: '20px',
-  padding: '32px', boxShadow: '0 24px 60px rgba(0,0,0,0.5)', position: 'relative', zIndex: 1,
-};
-
-const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: '12px', color: '#64748b', fontWeight: 600,
-  marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.06em',
-};
-
-const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '11px 14px', background: 'var(--bg-canvas)',
-  border: '1px solid var(--border-default)', borderRadius: '10px', color: 'var(--text-primary)',
-  fontSize: '14px', outline: 'none', boxSizing: 'border-box',
-};
-
-const iconStyle: React.CSSProperties = {
-  position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
 };
 
 export default RegisterPage;

@@ -19,11 +19,13 @@ import {
 import { useStore } from '../../store/useStore';
 import { loginUser } from '../../services/authApi';
 import { getApiBaseUrl, setCustomApiUrl } from '../../utils/apiUrl';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import type { AuthUser } from '../../store/useStore';
 import InteractiveBackground from '../../components/layout/InteractiveBackground';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const { setUser, setToken, setSessionId } = useStore();
 
   const [email, setEmail] = useState('');
@@ -87,7 +89,7 @@ const LoginPage: React.FC = () => {
       alignItems: 'center',
       justifyContent: 'center',
       background: 'var(--bg-app)',
-      padding: '24px',
+      padding: isMobile ? '16px' : '24px',
       position: 'relative',
       overflow: 'hidden',
     }}>
@@ -97,13 +99,13 @@ const LoginPage: React.FC = () => {
       {/* Background glowing blobs */}
       <div style={{
         position: 'absolute', top: '15%', left: '10%',
-        width: '400px', height: '400px',
+        width: isMobile ? '250px' : '400px', height: isMobile ? '250px' : '400px',
         background: 'radial-gradient(circle, var(--accent-primary-light) 0%, transparent 70%)',
         filter: 'blur(60px)', pointerEvents: 'none',
       }} />
       <div style={{
         position: 'absolute', bottom: '15%', right: '10%',
-        width: '350px', height: '350px',
+        width: isMobile ? '200px' : '350px', height: isMobile ? '200px' : '350px',
         background: 'radial-gradient(circle, var(--accent-primary-light) 0%, transparent 70%)',
         filter: 'blur(60px)', pointerEvents: 'none',
       }} />
@@ -115,23 +117,23 @@ const LoginPage: React.FC = () => {
         style={{ width: '100%', maxWidth: '460px', position: 'relative', zIndex: 1 }}
       >
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+        <div style={{ textAlign: 'center', marginBottom: isMobile ? '16px' : '24px' }}>
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.3 }}
             style={{
-              width: '64px', height: '64px',
+              width: isMobile ? '52px' : '64px', height: isMobile ? '52px' : '64px',
               background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-primary-hover))',
               borderRadius: '18px', margin: '0 auto 16px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               boxShadow: 'var(--shadow-md)',
             }}
           >
-            <LogIn size={30} color="white" />
+            <LogIn size={isMobile ? 24 : 30} color="white" />
           </motion.div>
 
-          <h1 style={{ fontSize: '26px', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 6px' }}>
+          <h1 style={{ fontSize: isMobile ? '22px' : '26px', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 6px' }}>
             Welcome Back
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>

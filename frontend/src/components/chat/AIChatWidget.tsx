@@ -20,6 +20,7 @@ import {
   GripHorizontal,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import { askQuestion } from '../../services/api';
 
 // ─── Suggested questions ─────────────────────────────────────────────────────
@@ -450,21 +451,22 @@ const AIChatWidget: React.FC = () => {
       <AnimatePresence>
         {isOpen && (
           <motion.div
+            className="chat-widget-window"
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
             style={{
               pointerEvents: 'auto',
-              width: 460,
-              maxWidth: 'calc(100vw - 32px)',
-              height: 640,
-              maxHeight: 'calc(100vh - 120px)',
+              width: isMobile ? '100%' : 460,
+              maxWidth: isMobile ? '100%' : 'calc(100vw - 32px)',
+              height: isMobile ? '100%' : 640,
+              maxHeight: isMobile ? '100%' : 'calc(100vh - 120px)',
               display: 'flex',
               flexDirection: 'column',
               background: 'var(--bg-surface)',
-              border: '1px solid var(--border-default)',
-              borderRadius: '16px',
+              border: isMobile ? 'none' : '1px solid var(--border-default)',
+              borderRadius: isMobile ? 0 : '16px',
               boxShadow: 'var(--shadow-lg)',
               overflow: 'hidden',
             }}
@@ -733,20 +735,21 @@ const AIChatWidget: React.FC = () => {
 
       {/* ── Floating Bubble Button ─────────────────────────────────────────── */}
       <motion.button
-        drag
+        drag={!isMobile}
         dragMomentum={false}
         dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
         dragElastic={0.1}
         whileHover={{ scale: 1.08 }}
         whileTap={{ scale: 0.95 }}
         onClick={handleToggle}
+        className="chat-widget-button"
         style={{
           pointerEvents: 'auto',
-          width: 60,
-          height: 60,
+          width: isMobile ? 52 : 60,
+          height: isMobile ? 52 : 60,
           borderRadius: '50%',
           border: 'none',
-          cursor: 'grab',
+          cursor: isMobile ? 'pointer' : 'grab',
           position: 'relative',
           display: 'flex',
           alignItems: 'center',

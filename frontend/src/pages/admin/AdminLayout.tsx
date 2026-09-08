@@ -11,9 +11,10 @@ import toast from 'react-hot-toast';
 import {
   LayoutDashboard, Users, Activity, FileText,
   Shield, LogOut, ChevronLeft, ChevronRight,
-  Monitor, BarChart3, ArrowLeft, Database, Sparkles
+  Monitor, BarChart3, ArrowLeft, Database, Sparkles, Menu, X
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import { logoutUser } from '../../services/authApi';
 
 const NAV_ITEMS = [
@@ -28,7 +29,9 @@ const AdminLayout: React.FC = () => {
   const { user, logout } = useStore();
   const location = useLocation();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const handleLogout = async () => {
     try { await logoutUser(); } catch { }
@@ -50,48 +53,84 @@ const AdminLayout: React.FC = () => {
 
   const SIDEBAR_W = collapsed ? 68 : 240;
 
+  // Close mobile nav on route change
+  React.useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-app)' }}>
+      {/* Mobile Sidebar Backdrop */}
+      {isMobile && (
+        <div
+          className={`sidebar-backdrop ${mobileNavOpen ? 'open' : ''}`}
+          onClick={() => setMobileNavOpen(false)}
+          style={{ cursor: 'pointer' }}
+        />
+      )}
+
       {/* Sidebar */}
       <motion.aside
-        animate={{ width: SIDEBAR_W }}
+        animate={{ width: isMobile ? 280 : SIDEBAR_W }}
         transition={{ duration: 0.25, ease: 'easeInOut' }}
+        className={isMobile ? `sidebar-desktop ${mobileNavOpen ? 'open' : ''}` : undefined}
         style={{
-          width: SIDEBAR_W, minHeight: '100vh', flexShrink: 0,
+          width: isMobile ? 280 : SIDEBAR_W, minHeight: '100vh', flexShrink: 0,
           background: 'var(--bg-sidebar)',
           borderRight: '1px solid var(--border-default)',
           display: 'flex', flexDirection: 'column',
-          position: 'sticky', top: 0, height: '100vh', overflow: 'hidden',
-          zIndex: 50,
+          position: isMobile ? 'fixed' : 'sticky', top: 0, height: '100vh', overflow: 'hidden',
+          zIndex: isMobile ? 200 : 50,
+          left: 0,
         }}
       >
         {/* Logo & Brand */}
         <div style={{
-          padding: collapsed ? '18px 12px' : '18px 16px',
+          padding: collapsed && !isMobile ? '18px 12px' : '18px 16px',
           borderBottom: '1px solid var(--border-default)',
           display: 'flex',
           alignItems: 'center',
-          gap: '10px'
+          justifyContent: (collapsed && !isMobile) ? 'center' : 'space-between',
+          gap: '10px',
+          minHeight: 60,
         }}>
-          <div style={{
-            width: '38px', height: '38px',
-            background: 'linear-gradient(135deg, #7c3aed, #4f46e5)',
-            borderRadius: '12px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0,
-            boxShadow: '0 4px 14px rgba(124,58,237,0.4)'
-          }}>
-            <Shield size={20} color="white" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '38px', height: '38px',
+              background: 'linear-gradient(135deg, #7c3aed, #4f46e5)',
+              borderRadius: '12px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+              boxShadow: '0 4px 14px rgba(124,58,237,0.4)'
+            }}>
+              <Shield size={20} color="white" />
+            </div>
+            {(!collapsed || isMobile) && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ overflow: 'hidden' }}>
+                <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.1 }}>
+                  Admin Portal
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--accent-primary)', marginTop: '2px', fontWeight: 600 }}>
+                  Infinitics AI Platform
+                </div>
+              </motion.div>
+            )}
           </div>
-          {!collapsed && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ overflow: 'hidden' }}>
-              <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.1 }}>
-                Admin Portal
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--accent-primary)', marginTop: '2px', fontWeight: 600 }}>
-                Infinitics AI Platform
-              </div>
-            </motion.div>
+          {/* Mobile Close Button */}
+          {isMobile && (
+            <button
+              onClick={() => setMobileNavOpen(false)}
+              style={{
+                width: 32, height: 32, borderRadius: 8,
+                border: '1px solid var(--border-default)',
+                backgroundColor: 'var(--bg-canvas)',
+                color: 'var(--text-secondary)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', flexShrink: 0,
+              }}
+            >
+              <X size={16} />
+            </button>
           )}
         </div>
 
@@ -302,30 +341,32 @@ const AdminLayout: React.FC = () => {
           </button>
         </div>
 
-        {/* Collapse Toggle */}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          style={{
-            position: 'absolute',
-            top: '22px',
-            right: collapsed ? 'auto' : '-13px',
-            left: collapsed ? '52px' : 'auto',
-            width: '26px',
-            height: '26px',
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border-default)',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            color: 'var(--text-secondary)',
-            zIndex: 60,
-            boxShadow: 'var(--shadow-sm)',
-          }}
-        >
-          {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-        </button>
+        {/* Collapse Toggle - Desktop Only */}
+        {!isMobile && (
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            style={{
+              position: 'absolute',
+              top: '22px',
+              right: collapsed ? 'auto' : '-13px',
+              left: collapsed ? '52px' : 'auto',
+              width: '26px',
+              height: '26px',
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border-default)',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: 'var(--text-secondary)',
+              zIndex: 60,
+              boxShadow: 'var(--shadow-sm)',
+            }}
+          >
+            {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          </button>
+        )}
       </motion.aside>
 
       {/* Main Content Area */}
@@ -339,12 +380,28 @@ const AdminLayout: React.FC = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 28px',
+          padding: isMobile ? '0 12px' : '0 28px',
           position: 'sticky',
           top: 0,
           zIndex: 40,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {/* Mobile Hamburger */}
+            {isMobile && (
+              <button
+                onClick={() => setMobileNavOpen(!mobileNavOpen)}
+                style={{
+                  width: 36, height: 36, borderRadius: 8,
+                  border: '1px solid var(--border-default)',
+                  backgroundColor: 'var(--bg-surface)',
+                  color: 'var(--text-secondary)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', flexShrink: 0,
+                }}
+              >
+                <Menu size={18} />
+              </button>
+            )}
             <span style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -354,10 +411,10 @@ const AdminLayout: React.FC = () => {
               color: 'var(--accent-primary)',
               borderRadius: '20px',
               padding: '4px 12px',
-              fontSize: '12px',
+              fontSize: isMobile ? '11px' : '12px',
               fontWeight: 700,
             }}>
-              <Shield size={13} color="var(--accent-primary)" /> Administrative Console
+              <Shield size={13} color="var(--accent-primary)" /> {!isMobile && 'Administrative Console'}
             </span>
           </div>
 
@@ -371,25 +428,25 @@ const AdminLayout: React.FC = () => {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                padding: '8px 16px',
+                padding: isMobile ? '6px 12px' : '8px 16px',
                 background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
                 border: 'none',
                 borderRadius: '10px',
                 color: 'white',
-                fontSize: '13px',
+                fontSize: isMobile ? '11px' : '13px',
                 fontWeight: 700,
                 cursor: 'pointer',
                 boxShadow: '0 4px 14px rgba(79,70,229,0.35)',
               }}
             >
-              <BarChart3 size={16} />
-              Go to Analysis Panel
+              {!isMobile && <BarChart3 size={16} />}
+              {!isMobile ? 'Go to Analysis Panel' : 'Analysis'}
             </motion.button>
           </div>
         </header>
 
         {/* Page Content */}
-        <main style={{ flex: 1, overflow: 'auto' }}>
+        <main style={{ flex: 1, overflow: 'auto', padding: isMobile ? '16px 12px' : '24px 28px' }}>
           <Outlet />
         </main>
       </div>

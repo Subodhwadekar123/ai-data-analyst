@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from 'react';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 
 interface Particle {
   x: number;
@@ -12,6 +13,7 @@ interface Particle {
 const InteractiveBackground: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mouseRef = useRef({ x: -1000, y: -1000, active: false });
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -21,11 +23,11 @@ const InteractiveBackground: React.FC = () => {
 
     let animationFrameId: number;
     let particles: Particle[] = [];
-    const spacing = 48; // Spacing between dots (optimized density)
-    const radius = 1.8; // Size of dots (clear visibility)
-    const forceRadius = 130; // Mouse interaction radius
-    const forceFactor = 3.5; // Push force
-    const returnSpeed = 0.08; // Damping return to home
+    const spacing = isMobile ? 80 : 48; // Reduced density on mobile
+    const radius = isMobile ? 1.2 : 1.8;
+    const forceRadius = isMobile ? 100 : 130;
+    const forceFactor = isMobile ? 2.5 : 3.5;
+    const returnSpeed = 0.08;
 
     const init = () => {
       const w = window.innerWidth;

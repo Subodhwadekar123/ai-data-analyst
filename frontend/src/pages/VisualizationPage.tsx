@@ -19,6 +19,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { useIsMobile } from '../hooks/useMediaQuery';
 import {
   generateVisualization,
   getVisualizationRecommendations,
@@ -104,6 +105,7 @@ const VISUALIZATION_CATALOG: VisualizationCatalogItem[] = [
 
 export default function VisualizationPage() {
   const { activeDataset } = useStore();
+  const isMobile = useIsMobile();
 
   // ── Visualization Selection & State ─────────────────────────────────────────
   const [selectedChartType, setSelectedChartType] = useState<string>('histogram');
@@ -809,7 +811,7 @@ export default function VisualizationPage() {
               )}
 
               {/* Labels */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '8px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.74rem', color: 'var(--text-secondary)', marginBottom: '2px' }}>X Label</label>
                   <input
@@ -835,7 +837,7 @@ export default function VisualizationPage() {
               </div>
 
               {/* Scale & Rotation */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '8px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.74rem', color: 'var(--text-secondary)', marginBottom: '2px' }}>Scale</label>
                   <select

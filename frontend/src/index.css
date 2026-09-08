@@ -698,3 +698,134 @@ body {
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE DESIGN SYSTEM
+   Mobile-first breakpoints: < 640px (mobile), 640-1023px (tablet), ≥ 1024px (desktop)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Mobile Navigation Overlay ──────────────────────────────────────────── */
+.mobile-nav-overlay {
+  display: none;
+}
+.mobile-nav-backdrop {
+  display: none;
+}
+.mobile-hamburger {
+  display: none;
+}
+
+/* ── Responsive Grid Utilities ──────────────────────────────────────────── */
+@media (max-width: 639px) {
+  .grid-responsive-4 { grid-template-columns: 1fr !important; }
+  .grid-responsive-3 { grid-template-columns: 1fr !important; }
+  .grid-responsive-2 { grid-template-columns: 1fr !important; }
+  .grid-responsive-4-2 { grid-template-columns: repeat(2, 1fr) !important; }
+
+  .flex-responsive-stack { flex-direction: column !important; }
+  .flex-responsive-wrap { flex-wrap: wrap !important; }
+
+  .hide-mobile { display: none !important; }
+  .show-mobile { display: flex !important; }
+
+  .w-full-mobile { width: 100% !important; }
+  .p-mobile-sm { padding: 12px !important; }
+  .p-mobile-md { padding: 16px !important; }
+  .gap-mobile-sm { gap: 8px !important; }
+
+  .text-center-mobile { text-align: center !important; }
+  .text-sm-mobile { font-size: 12px !important; }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .grid-responsive-4 { grid-template-columns: repeat(2, 1fr) !important; }
+  .grid-responsive-3 { grid-template-columns: repeat(2, 1fr) !important; }
+  .grid-responsive-2 { grid-template-columns: repeat(2, 1fr) !important; }
+
+  .hide-tablet { display: none !important; }
+}
+
+@media (min-width: 1024px) {
+  .hide-desktop { display: none !important; }
+}
+
+/* ── Touch Target Sizes ─────────────────────────────────────────────────── */
+@media (max-width: 1023px) {
+  button, a, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .btn-primary, .btn-secondary {
+    padding: 10px 16px !important;
+    font-size: 14px !important;
+  }
+
+  input, select, textarea {
+    font-size: 16px !important; /* Prevents iOS zoom on focus */
+  }
+}
+
+/* ── Mobile Sidebar Drawer ──────────────────────────────────────────────── */
+@media (max-width: 1023px) {
+  .sidebar-desktop {
+    position: fixed !important;
+    left: -280px !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    width: 280px !important;
+    z-index: 200 !important;
+    transition: left 0.3s ease !important;
+  }
+  .sidebar-desktop.open {
+    left: 0 !important;
+  }
+  .sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 199;
+  }
+  .sidebar-backdrop.open {
+    display: block;
+  }
+}
+
+/* ── Mobile Chat Widget ─────────────────────────────────────────────────── */
+@media (max-width: 639px) {
+  .chat-widget-window {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 0 !important;
+    z-index: 9999 !important;
+  }
+  .chat-widget-button {
+    bottom: 16px !important;
+    right: 16px !important;
+    width: 52px !important;
+    height: 52px !important;
+  }
+}
+
+/* ── Responsive Tables ──────────────────────────────────────────────────── */
+@media (max-width: 639px) {
+  table {
+    font-size: 12px !important;
+  }
+  th, td {
+    padding: 6px 8px !important;
+  }
+}
+
+/* ── Safe Area Insets (notch devices) ───────────────────────────────────── */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+

@@ -13,6 +13,7 @@ import {
   PieChart, GitMerge, Activity, X, Lock, CheckCircle, ArrowUpRight, UserPlus
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { useIsMobile } from '../hooks/useMediaQuery';
 import InteractiveBackground from '../components/layout/InteractiveBackground';
 
 const fadeUp: any = {
@@ -69,6 +70,7 @@ const TESTIMONIALS = [
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [mousePos, setMousePos] = useState({ x: -1000, y: -1000 });
   const { token, user } = useStore();
 
@@ -119,7 +121,7 @@ export default function HomePage() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 32px',
+          padding: isMobile ? '0 16px' : '0 32px',
           height: '68px',
         }}
       >
@@ -240,11 +242,11 @@ export default function HomePage() {
           style={{
             maxWidth: '1280px',
             margin: '0 auto',
-            padding: '0 32px',
+            padding: isMobile ? '0 16px' : '0 32px',
             width: '100%',
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
-            gap: '48px',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(360px, 1fr))',
+            gap: isMobile ? '32px' : '48px',
             alignItems: 'center',
             position: 'relative',
             zIndex: 1,
@@ -350,7 +352,7 @@ export default function HomePage() {
               variants={fadeUp}
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
+                gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(3, 1fr)',
                 gap: '12px',
                 maxWidth: '500px',
               }}
@@ -390,7 +392,7 @@ export default function HomePage() {
               style={{
                 backdropFilter: 'blur(24px)',
                 borderRadius: '24px',
-                padding: '32px',
+                padding: isMobile ? '24px 20px' : '32px',
                 boxShadow: 'var(--shadow-xl)',
                 maxWidth: '420px',
                 width: '100%',
@@ -534,7 +536,7 @@ export default function HomePage() {
       {/* ── Interactive Capability Showcase Grid ───────────────────────────── */}
       <section
         style={{
-          padding: '40px 32px 80px',
+          padding: isMobile ? '40px 16px 60px' : '40px 32px 80px',
           maxWidth: '1280px',
           margin: '0 auto',
           position: 'relative',
@@ -543,7 +545,7 @@ export default function HomePage() {
       >
         <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={stagger}>
           <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-            <h2 style={{ fontSize: '2.2rem', fontWeight: 800, fontFamily: "'Outfit', sans-serif", margin: '0 0 12px' }}>
+            <h2 style={{ fontSize: isMobile ? '1.6rem' : '2.2rem', fontWeight: 800, fontFamily: "'Outfit', sans-serif", margin: '0 0 12px' }}>
               Explore Platform Capabilities
             </h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>
@@ -554,7 +556,7 @@ export default function HomePage() {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(280px, 1fr))',
               gap: '20px',
             }}
           >
@@ -600,16 +602,16 @@ export default function HomePage() {
       </section>
 
       {/* ── Testimonials ──────────────────────────────────────────────────── */}
-      <section style={{ padding: '80px 32px', background: 'var(--bg-app)', borderTop: '1px solid var(--border-default)' }}>
+      <section style={{ padding: isMobile ? '60px 16px' : '80px 32px', background: 'var(--bg-app)', borderTop: '1px solid var(--border-default)' }}>
         <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={stagger} style={{ maxWidth: '1100px', margin: '0 auto' }}>
           <motion.div variants={fadeUp} style={{ textAlign: 'center', marginBottom: '48px' }}>
-            <h2 style={{ fontSize: '2.2rem', fontWeight: 800, fontFamily: "'Outfit', sans-serif", marginBottom: '12px' }}>
+            <h2 style={{ fontSize: isMobile ? '1.6rem' : '2.2rem', fontWeight: 800, fontFamily: "'Outfit', sans-serif", marginBottom: '12px' }}>
               Trusted by Data Teams Worldwide
             </h2>
             <p style={{ color: 'var(--text-secondary)' }}>From independent analysts to high-scale enterprise departments.</p>
           </motion.div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
             {TESTIMONIALS.map(({ name, role, avatar, text, rating }) => (
               <motion.div
                 key={name}
@@ -663,30 +665,30 @@ export default function HomePage() {
       <footer
         style={{
           borderTop: '1px solid var(--border-default)',
-          padding: '36px 32px',
+          padding: isMobile ? '24px 16px' : '36px 32px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           flexWrap: 'wrap',
-          gap: '16px',
+          gap: isMobile ? '12px' : '16px',
           maxWidth: '1280px',
           margin: '0 auto',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <img src="/logo.jpg" alt="Logo" style={{ width: 22, height: 22, borderRadius: '6px', objectFit: 'cover', mixBlendMode: 'normal' }} />
           <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '14px' }}>Infinitics AI</span>
-          <span style={{ color: 'var(--border-strong)', margin: '0 8px' }}>|</span>
+          {!isMobile && <span style={{ color: 'var(--border-strong)', margin: '0 8px' }}>|</span>}
           <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>AI-Powered Automated Data Analytics & Machine Learning</span>
         </div>
 
-        <div style={{ display: 'flex', gap: '20px' }}>
+        <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
           <Link to="/login" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '13px' }}>User Portal</Link>
           <Link to="/admin/login" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontSize: '13px', fontWeight: 600 }}>Admin Center</Link>
           <Link to="/register" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '13px' }}>Register</Link>
         </div>
 
-        <p style={{ color: 'var(--text-muted)', fontSize: '12px', margin: 0 }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: '12px', margin: 0, width: isMobile ? '100%' : 'auto', textAlign: isMobile ? 'center' : 'left' }}>
           © {new Date().getFullYear()} Infinitics AI Platform. All rights reserved.
         </p>
       </footer>

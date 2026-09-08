@@ -21,6 +21,7 @@ import {
   Type,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { useIsMobile } from '../hooks/useMediaQuery';
 import { getSummary, listDatasets, getQualityScore, deleteDataset } from '../services/api';
 import EmptyState from '../components/ui/EmptyState';
 import StatCard from '../components/ui/StatCard';
@@ -161,6 +162,7 @@ const DashboardHome: React.FC = () => {
     datasets,
     removeDataset,
   } = useStore();
+  const isMobile = useIsMobile();
 
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState<any>(null);
@@ -285,14 +287,14 @@ const DashboardHome: React.FC = () => {
 
       {!loading && (
         <>
-          {/* Stat Cards 4x2 Grid */}
+          {/* Stat Cards Grid */}
           <motion.div
             variants={container}
             initial="hidden"
             animate="show"
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+              gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(220px, 1fr))',
               gap: '12px',
               marginBottom: '22px',
             }}
@@ -310,7 +312,7 @@ const DashboardHome: React.FC = () => {
           </motion.div>
 
           {/* Two-column section */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '18px', marginBottom: '22px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 340px', gap: '18px', marginBottom: '22px' }}>
             {/* Column details table */}
             <motion.div
               initial={{ opacity: 0 }}
@@ -434,7 +436,7 @@ const DashboardHome: React.FC = () => {
             <h2 style={{ margin: '0 0 12px', fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>
               Analysis Workflows
             </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px' }}>
               <QuickAction
                 label="Exploratory Data Analysis"
                 description="Distributions, correlations & outlier diagnostics"

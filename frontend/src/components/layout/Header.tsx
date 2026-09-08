@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sun, Moon, Database, ChevronDown, RefreshCw, Plus, User, Shield, Sparkles, Palette } from 'lucide-react';
+import { Sun, Moon, Database, ChevronDown, RefreshCw, Plus, User, Shield, Sparkles, Palette, Menu } from 'lucide-react';
 import { useStore } from '../../store/useStore';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 
 const routeTitles: Record<string, string> = {
   '/dashboard': 'Executive Overview',
@@ -19,9 +20,14 @@ const routeTitles: Record<string, string> = {
   '/dashboard/profile': 'Profile & Security',
 };
 
-const Header: React.FC = () => {
+interface HeaderProps {
+  onMenuToggle?: () => void;
+}
+
+const Header: React.FC<HeaderProps> = ({ onMenuToggle }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const {
     datasets,
     activeDataset,
@@ -63,16 +69,38 @@ const Header: React.FC = () => {
         borderBottom: '1px solid var(--border-default)',
         display: 'flex',
         alignItems: 'center',
-        padding: '0 24px',
-        gap: 16,
+        padding: isMobile ? '0 12px' : '0 24px',
+        gap: isMobile ? 8 : 16,
         position: 'sticky',
         top: 0,
         zIndex: 50,
         transition: 'background-color 0.2s ease, border-color 0.2s ease',
       }}
     >
+      {/* Mobile Hamburger Menu */}
+      {isMobile && (
+        <button
+          onClick={onMenuToggle}
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 8,
+            border: '1px solid var(--border-default)',
+            backgroundColor: 'var(--bg-surface)',
+            color: 'var(--text-secondary)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            flexShrink: 0,
+          }}
+        >
+          <Menu size={18} />
+        </button>
+      )}
+
       {/* Page Title & Breadcrumb */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
         <AnimatePresence mode="wait">
           <motion.h1
             key={pageTitle}
@@ -81,11 +109,14 @@ const Header: React.FC = () => {
             exit={{ opacity: 0, x: 6 }}
             transition={{ duration: 0.15 }}
             style={{
-              fontSize: 16,
+              fontSize: isMobile ? 14 : 16,
               fontWeight: 700,
               color: 'var(--text-primary)',
               margin: 0,
               letterSpacing: '-0.015em',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
             }}
           >
             {pageTitle}
@@ -110,7 +141,7 @@ const Header: React.FC = () => {
             fontSize: 13,
             fontWeight: 500,
             transition: 'all 0.15s ease',
-            minWidth: 190,
+            minWidth: isMobile ? 140 : 190,
             justifyContent: 'space-between',
             boxShadow: 'var(--shadow-xs)',
           }}
@@ -119,7 +150,7 @@ const Header: React.FC = () => {
             <Database size={14} color={activeDataset ? 'var(--accent-primary)' : 'var(--text-muted)'} />
             <span
               style={{
-                maxWidth: 130,
+                maxWidth: isMobile ? 80 : 130,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
@@ -137,6 +168,7 @@ const Header: React.FC = () => {
             style={{
               transition: 'transform 0.2s',
               transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+              flexShrink: 0,
             }}
           />
         </button>
@@ -267,14 +299,14 @@ const Header: React.FC = () => {
       </div>
 
       {/* Right Header Toolbar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 8 }}>
         {/* Refresh Page */}
         <button
           onClick={handleRefresh}
           title="Refresh Data"
           style={{
-            width: 34,
-            height: 34,
+            width: isMobile ? 32 : 34,
+            height: isMobile ? 32 : 34,
             borderRadius: 8,
             border: '1px solid var(--border-default)',
             backgroundColor: 'var(--bg-surface)',
@@ -296,8 +328,8 @@ const Header: React.FC = () => {
             onClick={() => navigate('/dashboard/profile')}
             title="Profile & Security Settings"
             style={{
-              height: 34,
-              padding: '0 10px',
+              height: isMobile ? 32 : 34,
+              padding: isMobile ? '0 8px' : '0 10px',
               borderRadius: 8,
               border: '1px solid var(--border-default)',
               backgroundColor: 'var(--bg-surface)',
@@ -314,8 +346,8 @@ const Header: React.FC = () => {
           >
             <div
               style={{
-                width: 20,
-                height: 20,
+                width: isMobile ? 22 : 20,
+                height: isMobile ? 22 : 20,
                 borderRadius: '50%',
                 background: user.is_admin ? 'var(--accent-amber)' : 'var(--accent-primary)',
                 color: '#fff',
@@ -324,16 +356,17 @@ const Header: React.FC = () => {
                 justifyContent: 'center',
                 fontSize: 10.5,
                 fontWeight: 700,
+                flexShrink: 0,
               }}
             >
               {(user.full_name || user.email || 'U')[0].toUpperCase()}
             </div>
-            <span>{user.full_name ? user.full_name.split(' ')[0] : 'Analyst'}</span>
+            {!isMobile && <span>{user.full_name ? user.full_name.split(' ')[0] : 'Analyst'}</span>}
           </button>
         )}
 
-        {/* Active Dataset Status Indicator */}
-        {activeDataset && (
+        {/* Active Dataset Status Indicator - Hidden on mobile (shown in sidebar) */}
+        {activeDataset && !isMobile && (
           <div
             style={{
               display: 'flex',

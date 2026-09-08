@@ -22,9 +22,11 @@ import {
   Shield,
   User,
   MessageSquare,
+  X,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { logoutUser } from '../../services/authApi';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 
 interface NavItem {
   icon: React.ReactNode;
@@ -74,9 +76,15 @@ const navSections: NavSection[] = [
   },
 ];
 
-const Sidebar: React.FC = () => {
+interface SidebarProps {
+  mobileOpen?: boolean;
+  onClose?: () => void;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onClose }) => {
   const { sidebarCollapsed, setSidebarCollapsed, activeDataset, user, logout } = useStore();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   const dynamicSections = [...navSections];
   if (user?.is_admin) {
@@ -90,10 +98,17 @@ const Sidebar: React.FC = () => {
 
   const width = sidebarCollapsed ? 64 : 230;
 
+  const handleNavClick = () => {
+    if (isMobile && onClose) {
+      onClose();
+    }
+  };
+
   return (
     <motion.aside
-      animate={{ width }}
+      animate={{ width: isMobile ? 280 : width }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+      className={isMobile ? `sidebar-desktop ${mobileOpen ? 'open' : ''}` : undefined}
       style={{
         position: 'fixed',
         left: 0,
@@ -112,51 +127,74 @@ const Sidebar: React.FC = () => {
       {/* Platform Branding */}
       <div
         style={{
-          padding: sidebarCollapsed ? '16px 0' : '16px',
+          padding: sidebarCollapsed && !isMobile ? '16px 0' : '16px',
           display: 'flex',
           alignItems: 'center',
+          justifyContent: (sidebarCollapsed && !isMobile) ? 'center' : 'space-between',
           gap: 10,
           cursor: 'pointer',
           borderBottom: '1px solid var(--border-subtle)',
           minHeight: 60,
-          justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
         }}
         onClick={() => navigate('/dashboard')}
       >
-        <img 
-          src="/logo.jpg" 
-          alt="Infinitics AI" 
-          style={{
-            width: 30,
-            height: 30,
-            borderRadius: 7,
-            objectFit: 'cover',
-            boxShadow: 'var(--shadow-xs)',
-            flexShrink: 0,
-          }} 
-        />
-        <AnimatePresence>
-          {!sidebarCollapsed && (
-            <motion.div
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -8 }}
-              transition={{ duration: 0.15 }}
-              style={{ overflow: 'hidden', whiteSpace: 'nowrap' }}
-            >
-              <span
-                style={{
-                  fontSize: 15,
-                  fontWeight: 700,
-                  color: 'var(--text-primary)',
-                  letterSpacing: '-0.02em',
-                }}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: (sidebarCollapsed && !isMobile) ? 'center' : 'flex-start' }}>
+          <img 
+            src="/logo.jpg" 
+            alt="Infinitics AI" 
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 7,
+              objectFit: 'cover',
+              boxShadow: 'var(--shadow-xs)',
+              flexShrink: 0,
+            }} 
+          />
+          <AnimatePresence>
+            {(!sidebarCollapsed || isMobile) && (
+              <motion.div
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -8 }}
+                transition={{ duration: 0.15 }}
+                style={{ overflow: 'hidden', whiteSpace: 'nowrap' }}
               >
-                Infinitics <span style={{ color: 'var(--accent-primary)', fontWeight: 800 }}>AI</span>
-              </span>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                <span
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 700,
+                    color: 'var(--text-primary)',
+                    letterSpacing: '-0.02em',
+                  }}
+                >
+                  Infinitics <span style={{ color: 'var(--accent-primary)', fontWeight: 800 }}>AI</span>
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+        {/* Mobile Close Button */}
+        {isMobile && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onClose?.(); }}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              border: '1px solid var(--border-default)',
+              backgroundColor: 'var(--bg-canvas)',
+              color: 'var(--text-secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
+          >
+            <X size={16} />
+          </button>
+        )}
       </div>
 
       {/* Nav Sections List */}
@@ -164,7 +202,7 @@ const Sidebar: React.FC = () => {
         {dynamicSections.map((section) => (
           <div key={section.heading} style={{ marginBottom: 8 }}>
             <AnimatePresence>
-              {!sidebarCollapsed && (
+              {(!sidebarCollapsed || isMobile) && (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -190,15 +228,16 @@ const Sidebar: React.FC = () => {
                 to={item.path}
                 end={item.path === '/dashboard' || item.path === '/'}
                 className="sidebar-nav-link"
+                onClick={handleNavClick}
                 style={({ isActive }) => ({
                   display: 'flex',
                   alignItems: 'center',
                   gap: 10,
-                  padding: sidebarCollapsed ? '9px 0' : '8px 12px',
+                  padding: sidebarCollapsed && !isMobile ? '9px 0' : '8px 12px',
                   margin: '2px 8px',
                   borderRadius: 7,
                   textDecoration: 'none',
-                  justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                  justifyContent: sidebarCollapsed && !isMobile ? 'center' : 'flex-start',
                   fontSize: 13,
                   fontWeight: isActive ? 600 : 500,
                   color: isActive ? 'var(--accent-primary)' : 'var(--text-secondary)',
@@ -209,7 +248,7 @@ const Sidebar: React.FC = () => {
                   transition: 'all 0.15s ease',
                   position: 'relative',
                 })}
-                title={sidebarCollapsed ? item.label : undefined}
+                title={sidebarCollapsed && !isMobile ? item.label : undefined}
               >
                 {({ isActive }) => (
                   <>
@@ -245,7 +284,7 @@ const Sidebar: React.FC = () => {
                       {item.icon}
                     </span>
                     <AnimatePresence>
-                      {!sidebarCollapsed && (
+                      {(!sidebarCollapsed || isMobile) && (
                         <motion.span
                           initial={{ opacity: 0, x: -6 }}
                           animate={{ opacity: 1, x: 0 }}
@@ -267,7 +306,7 @@ const Sidebar: React.FC = () => {
 
       {/* Active Dataset Drawer */}
       <AnimatePresence>
-        {activeDataset && !sidebarCollapsed && (
+        {activeDataset && (!sidebarCollapsed || isMobile) && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -320,7 +359,7 @@ const Sidebar: React.FC = () => {
       </AnimatePresence>
 
       {/* User Profile & Sign Out Footer */}
-      {!sidebarCollapsed && user && (
+      {(!sidebarCollapsed || isMobile) && user && (
         <div
           style={{
             marginTop: 'auto',
@@ -418,7 +457,7 @@ const Sidebar: React.FC = () => {
         </div>
       )}
 
-      {sidebarCollapsed && user && (
+      {sidebarCollapsed && user && !isMobile && (
         <div
           style={{
             marginTop: 'auto',
@@ -454,36 +493,38 @@ const Sidebar: React.FC = () => {
         </div>
       )}
 
-      {/* Collapse/Expand Action */}
-      <div
-        style={{
-          borderTop: '1px solid var(--border-subtle)',
-          padding: '8px 0',
-          display: 'flex',
-          justifyContent: sidebarCollapsed ? 'center' : 'flex-end',
-          paddingRight: sidebarCollapsed ? 0 : 10,
-        }}
-      >
-        <button
-          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+      {/* Collapse/Expand Action - Desktop Only */}
+      {!isMobile && (
+        <div
           style={{
-            width: 28,
-            height: 28,
-            borderRadius: 6,
-            border: '1px solid var(--border-default)',
-            backgroundColor: 'var(--bg-canvas)',
-            color: 'var(--text-secondary)',
+            borderTop: '1px solid var(--border-subtle)',
+            padding: '8px 0',
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease',
+            justifyContent: sidebarCollapsed ? 'center' : 'flex-end',
+            paddingRight: sidebarCollapsed ? 0 : 10,
           }}
-          title={sidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'}
         >
-          {sidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-        </button>
-      </div>
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 6,
+              border: '1px solid var(--border-default)',
+              backgroundColor: 'var(--bg-canvas)',
+              color: 'var(--text-secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+            title={sidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+          >
+            {sidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          </button>
+        </div>
+      )}
     </motion.aside>
   );
 };
