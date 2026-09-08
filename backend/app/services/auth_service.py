@@ -30,7 +30,11 @@ from app.services.audit_service import (
 )
 from app.services.email_service import (
     send_verification_email_bg, send_password_reset_bg,
-    send_password_changed_bg, send_new_device_login_bg, send_account_locked_bg
+    send_password_changed_bg, send_new_device_login_bg, send_account_locked_bg,
+    send_otp_email_bg,
+)
+from app.services.otp_service import (
+    create_otp_challenge, verify_otp_code, get_challenge, check_resend_allowed,
 )
 from app.utils.device_parser import parse_user_agent
 from app.utils.logger import setup_logger
@@ -99,7 +103,11 @@ def register_user(
     db.refresh(user)
 
     # Generate verification token & attempt email send
-    verification_url = _send_verification_email(db, user, ip_address)
+    # When OTP verification is enabled, the 6-digit code email is sent by the
+    # router (via send_registration_otp) instead of the magic-link email.
+    verification_url = None
+    if not getattr(settings, "OTP_ENABLED", False):
+        verification_url = _send_verification_email(db, user, ip_address)
 
     log_event(db, AuditAction.REGISTER, user_id=user.id, user_email=user.email,
               ip_address=ip_address, description="New user registration" + (" (auto-verified)" if auto_verify else ""))
@@ -132,6 +140,93 @@ def _send_verification_email(db: Session, user: UserRecord, ip_address: str = "U
     verification_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
     send_verification_email_bg(user.email, user.full_name or user.email, verification_url)
     return verification_url
+
+
+# ── Registration OTP (6-digit email code verification) ────────────────────────
+
+def send_registration_otp(db: Session, user: UserRecord) -> Tuple[str, datetime]:
+    """
+    Create an OTP challenge for a freshly registered user and email the code.
+    Returns (challenge_id, expires_at).
+    """
+    challenge_id, code, expires_at = create_otp_challenge(db, user.id, purpose="registration")
+
+    send_otp_email_bg(
+        user.email,
+        user.full_name or user.email,
+        code,
+        settings.OTP_EXPIRE_MINUTES,
+    )
+
+    log_event(db, AuditAction.EMAIL_VERIFICATION_SENT, user_id=user.id, user_email=user.email,
+              description="Registration OTP code sent")
+    return challenge_id, expires_at
+
+
+def resend_registration_otp(db: Session, challenge_id: str) -> Tuple[str, datetime]:
+    """
+    Resend the registration OTP for an existing challenge (cooldown-limited).
+    Returns (new_challenge_id, expires_at).
+    """
+    # pyrefly: ignore [missing-import]
+    from fastapi import HTTPException
+
+    challenge = get_challenge(db, challenge_id)
+    try:
+        check_resend_allowed(challenge)
+    except ValueError as e:
+        raise HTTPException(status_code=429, detail=str(e))
+
+    user = challenge.user
+    new_challenge_id, _code, expires_at = create_otp_challenge(db, user.id, purpose=challenge.purpose)
+
+    send_otp_email_bg(
+        user.email,
+        user.full_name or user.email,
+        _code,
+        settings.OTP_EXPIRE_MINUTES,
+    )
+
+    log_event(db, AuditAction.RESEND_VERIFICATION, user_id=user.id, user_email=user.email,
+              description="Registration OTP code resent")
+    return new_challenge_id, expires_at
+
+
+def verify_registration_otp(
+    db: Session,
+    challenge_id: str,
+    code: str,
+    user_agent: str = "",
+    ip_address: str = "Unknown",
+) -> Tuple[str, str, str, UserRecord]:
+    """
+    Verify the registration OTP code: mark the user's email as verified,
+    then auto-login (create session + tokens) so the user lands in the app.
+
+    Returns (access_token, refresh_token, session_id, user).
+    Raises ValueError with a user-safe message on invalid/expired/wrong codes.
+    """
+    challenge = verify_otp_code(db, challenge_id, code)
+    user = challenge.user
+
+    was_verified = user.is_verified
+    user.is_verified = True
+    db.commit()
+    db.refresh(user)
+
+    if not was_verified:
+        log_event(db, AuditAction.EMAIL_VERIFIED, user_id=user.id, user_email=user.email,
+                  ip_address=ip_address, description="Email verified via OTP code")
+
+    logger.info(f"[SUCCESS] Email verified via OTP for user: {user.email}")
+
+    return issue_session_for_user(
+        db=db,
+        user=user,
+        user_agent=user_agent,
+        ip_address=ip_address,
+        remember_me=True,  # fresh registrations get a long-lived session
+    )
 
 
 def verify_email_token(db: Session, token: str) -> UserRecord:
@@ -253,6 +348,36 @@ def login_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Your account has been deactivated. Please contact support.",
         )
+
+    # Reset failed attempts on successful login
+    return issue_session_for_user(
+        db=db,
+        user=user,
+        user_agent=user_agent,
+        ip_address=ip_address,
+        remember_me=remember_me,
+        device_info=device_info,
+    )
+
+
+def issue_session_for_user(
+    db: Session,
+    user: UserRecord,
+    user_agent: str = "",
+    ip_address: str = "Unknown",
+    remember_me: bool = False,
+    device_info: Optional[dict] = None,
+) -> Tuple[str, str, str, UserRecord]:
+    """
+    Create a full session (session record, refresh token, JWT access token)
+    for a user whose identity has already been verified (password or OTP).
+
+    Used by both login and post-registration OTP verification (auto-login).
+
+    Returns:
+        (access_token, refresh_token, session_id, user)
+    """
+    device_info = device_info or parse_user_agent(user_agent)
 
     # Reset failed attempts on successful login
     user.failed_login_attempts = 0

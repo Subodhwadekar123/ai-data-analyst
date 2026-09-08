@@ -33,7 +33,9 @@ from app.services.auth_service import (
     refresh_access_token, verify_email_token, resend_verification_email,
     forgot_password, reset_password, change_password,
     get_active_sessions, revoke_session,
+    send_registration_otp, resend_registration_otp, verify_registration_otp,
 )
+from app.config import settings
 from app.utils.device_parser import get_client_ip
 from app.utils.logger import setup_logger
 
@@ -73,6 +75,15 @@ class ResendVerificationRequest(BaseModel):
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
+
+
+class VerifyOtpRequest(BaseModel):
+    challenge_id: str
+    code: str
+
+
+class ResendOtpRequest(BaseModel):
+    challenge_id: str
 
 
 class ResetPasswordRequest(BaseModel):
@@ -197,7 +208,11 @@ def _set_refresh_cookie(response: Response, refresh_token: str, remember_me: boo
 async def register(request: Request, body: RegisterRequest, db: Session = Depends(get_db)):
     """
     Register a new user account.
-    Sends a verification email. Login is blocked until email is verified.
+
+    When OTP verification is enabled (default), a 6-digit code is emailed to the
+    user and the response contains `otp_required: true` plus a `challenge_id`.
+    The account only becomes fully active after the code is verified via
+    POST /auth/verify-otp (which also auto-logs the user in).
     """
     ip = get_client_ip(request)
     user, verification_url = register_user(
@@ -208,12 +223,90 @@ async def register(request: Request, body: RegisterRequest, db: Session = Depend
         username=body.username,
         ip_address=ip,
     )
-    return {
-        "message": "Account created and activated successfully!" if user.is_verified else "Account created successfully. Please check your email to verify your account.",
+
+    response: dict = {
+        "message": "Account created successfully." if user.is_verified else "Account created successfully. Please verify your email.",
         "user_id": user.id,
         "email": user.email,
         "is_verified": user.is_verified,
         "verification_url": verification_url,
+    }
+
+    # OTP email verification flow
+    if getattr(settings, "OTP_ENABLED", False) and not user.is_verified:
+        challenge_id, expires_at = send_registration_otp(db, user)
+        response["otp_required"] = True
+        response["challenge_id"] = challenge_id
+        response["masked_email"] = _mask_email(user.email)
+        response["expires_at"] = expires_at.isoformat()
+        response["message"] = "Account created! We emailed you a 6-digit verification code."
+
+    return response
+
+
+# ── Helper: Mask Email for Safe Display ──────────────────────────────────────
+
+def _mask_email(email: str) -> str:
+    """Mask an email for display, e.g. 'subodh.wadekar@gmail.com' -> 's***r@gmail.com'."""
+    try:
+        local, domain = email.split("@", 1)
+        if len(local) <= 2:
+            masked_local = local[0] + "*"
+        else:
+            masked_local = local[0] + "*" * (len(local) - 2) + local[-1]
+        return f"{masked_local}@{domain}"
+    except Exception:
+        return email[:2] + "***"
+
+
+@router.post("/verify-otp", summary="Verify Registration OTP Code (auto-login)")
+async def verify_otp(request: Request, body: VerifyOtpRequest, response: Response,
+                     db: Session = Depends(get_db)):
+    """
+    Verify the 6-digit OTP code sent to the user's email during registration.
+    On success the account is activated and the user is logged in automatically
+    (full token response, identical shape to /auth/login).
+    """
+    ip = get_client_ip(request)
+    ua = request.headers.get("User-Agent", "")
+
+    try:
+        access_token, refresh_token, session_id, user = verify_registration_otp(
+            db=db,
+            challenge_id=body.challenge_id,
+            code=body.code,
+            user_agent=ua,
+            ip_address=ip,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    _set_refresh_cookie(response, refresh_token, remember_me=True)
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "session_id": session_id,
+        "user": UserOut.model_validate(user).model_dump(),
+        "message": "Email verified successfully. Welcome aboard!",
+    }
+
+
+@router.post("/resend-otp", summary="Resend Registration OTP Code")
+async def resend_otp(request: Request, body: ResendOtpRequest, db: Session = Depends(get_db)):
+    """
+    Resend a new 6-digit OTP code for an existing challenge.
+    Rate-limited by a resend cooldown (default 60s between sends).
+    """
+    try:
+        challenge_id, expires_at = resend_registration_otp(db, body.challenge_id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    return {
+        "message": "A new verification code has been sent to your email.",
+        "challenge_id": challenge_id,
+        "expires_at": expires_at.isoformat(),
     }
 
 

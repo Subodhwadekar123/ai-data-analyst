@@ -236,6 +236,28 @@ class LoginHistory(Base):
     )
 
 
+class OTPChallenge(Base):
+    """Short-lived email OTP challenge (e.g., registration email verification)."""
+    __tablename__ = "otp_challenges"
+
+    id = Column(String, primary_key=True, index=True)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    purpose = Column(String, default="registration", nullable=False)  # "registration" | "login"
+
+    # Security
+    code_hash = Column(String, nullable=False)       # SHA-256 hash of the OTP code
+    attempts = Column(Integer, default=0)            # Wrong-code attempts consumed
+    consumed = Column(Boolean, default=False)        # Set True after successful verify
+
+    # Timing
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    last_sent_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationship
+    user = relationship("UserRecord")
+
+
 class AuditLog(Base):
     """Security audit trail for all significant events."""
     __tablename__ = "audit_logs"

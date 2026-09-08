@@ -209,6 +209,36 @@ async def send_account_locked_email(
     )
 
 
+async def send_otp_email(
+    to_email: str,
+    full_name: str,
+    otp_code: str,
+    expire_minutes: int = 10,
+) -> bool:
+    """Send a 6-digit OTP verification code email (registration verification)."""
+    logger.info(
+        f"\n=======================================================\n"
+        f">>> [OTP CODE for {to_email}]: {otp_code}\n"
+        f"=======================================================\n"
+    )
+    html = _render_template("otp_email.html", {
+        "full_name": full_name or to_email.split("@")[0],
+        "otp_code": otp_code,
+        "expire_minutes": expire_minutes,
+    })
+    return await _send_email(
+        to_email=to_email,
+        subject="🔐 Your Verification Code — AI Data Analyst",
+        html_body=html,
+        text_body=(
+            f"Hi {full_name or to_email.split('@')[0]},\n\n"
+            f"Your AI Data Analyst verification code is: {otp_code}\n\n"
+            f"It expires in {expire_minutes} minutes.\n"
+            f"If you didn't request this code, you can safely ignore this email."
+        ),
+    )
+
+
 # ── Fire-and-Forget Wrappers (non-blocking) ───────────────────────────────────
 
 def send_verification_email_bg(to_email: str, full_name: str, verification_url: str):
@@ -225,3 +255,6 @@ def send_new_device_login_bg(to_email: str, full_name: str, ip: str, browser: st
 
 def send_account_locked_bg(to_email: str, full_name: str, attempts: int, lockout_min: int, ip: str = "Unknown"):
     _fire_and_forget(send_account_locked_email(to_email, full_name, attempts, lockout_min, ip))
+
+def send_otp_email_bg(to_email: str, full_name: str, otp_code: str, expire_minutes: int = 10):
+    _fire_and_forget(send_otp_email(to_email, full_name, otp_code, expire_minutes))

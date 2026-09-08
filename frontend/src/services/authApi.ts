@@ -44,6 +44,8 @@ authApi.interceptors.response.use(
     const isPublicAuthRoute =
       requestUrl.includes('/auth/login') ||
       requestUrl.includes('/auth/register') ||
+      requestUrl.includes('/auth/verify-otp') ||
+      requestUrl.includes('/auth/resend-otp') ||
       requestUrl.includes('/auth/forgot-password') ||
       requestUrl.includes('/auth/reset-password') ||
       requestUrl.includes('/auth/verify-email') ||
@@ -146,6 +148,12 @@ export interface LoginResponse {
 
 export const registerUser = (payload: RegisterPayload): Promise<any> =>
   authApi.post('/auth/register', payload) as Promise<any>;
+
+export const verifyOtp = (challengeId: string, code: string): Promise<any> =>
+  authApi.post('/auth/verify-otp', { challenge_id: challengeId, code }) as Promise<any>;
+
+export const resendOtp = (challengeId: string): Promise<any> =>
+  authApi.post('/auth/resend-otp', { challenge_id: challengeId }) as Promise<any>;
 
 export const loginUser = (payload: LoginPayload): Promise<LoginResponse> =>
   authApi.post('/auth/login', payload) as Promise<LoginResponse>;
