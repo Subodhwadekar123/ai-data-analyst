@@ -17,7 +17,23 @@ services:
       - key: ENVIRONMENT
         value: "production"
       - key: AUTO_VERIFY_USERS
+        value: "false"
+      - key: OTP_ENABLED
         value: "true"
+      - key: SMTP_HOST
+        value: "smtp.gmail.com"
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USE_TLS
+        value: "true"
+      - key: SMTP_USER
+        value: "infinitics.ai.app@gmail.com"
+      - key: SMTP_FROM
+        value: "infinitics.ai.app@gmail.com"
+      - key: SMTP_FROM_NAME
+        value: "Infinitics AI"
+      - key: SMTP_PASSWORD
+        sync: false
       - key: SECRET_KEY
         generateValue: true
       - key: GEMINI_API_KEY
