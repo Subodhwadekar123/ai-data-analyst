@@ -85,6 +85,21 @@ const PALETTES: Record<string, string[]> = {
   minimalist: ['#0f172a', '#334155', '#475569', '#64748b', '#94a3b8', '#cbd5e1', '#0284c7', '#0d9488']
 };
 
+// ── Color utilities ───────────────────────────────────────────────────────────
+const hexToRgba = (hex: string, opacity: number) => {
+  if (!hex) return `rgba(59, 130, 246, ${opacity})`;
+  if (hex.startsWith('#')) {
+    const cleaned = hex.replace('#', '');
+    const full = cleaned.length === 3 ? cleaned.split('').map((c) => c + c).join('') : cleaned;
+    const num = parseInt(full, 16);
+    if (!Number.isNaN(num) && full.length === 6) {
+      return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, ${opacity})`;
+    }
+  }
+  if (hex.startsWith('rgba(') || hex.startsWith('rgb(')) return hex;
+  return hex;
+};
+
 export const UniversalPlotlyChart: React.FC<UniversalPlotlyChartProps> = ({
   chartType,
   chartData,
@@ -104,6 +119,7 @@ export const UniversalPlotlyChart: React.FC<UniversalPlotlyChartProps> = ({
       setPlotlyLoaded(true);
       return;
     }
+    // @ts-ignore - plotly.js ships without type declarations
     import('plotly.js/dist/plotly.js')
       .then((mod) => {
         PlotlyLib = mod.default || mod;
@@ -476,22 +492,47 @@ export const UniversalPlotlyChart: React.FC<UniversalPlotlyChartProps> = ({
     // ── 10. 3D SCATTER & SURFACE ─────────────────────────────────────────────
     else if (type === 'scatter_3d' || type === '3d_scatter') {
       const pts = chartData.points || [];
-      traces.push({
-        type: 'scatter3d',
-        mode: 'markers',
-        x: pts.map((p: any) => p.x),
-        y: pts.map((p: any) => p.y),
-        z: pts.map((p: any) => p.z),
-        marker: {
-          color: primary,
-          size: 4,
-          opacity: alpha,
-        },
-      });
+      const hasHue = pts.some((p: any) => p.color !== undefined);
+      if (hasHue) {
+        const groups: Record<string, any[]> = {};
+        pts.forEach((p: any) => {
+          const k = String(p.color);
+          if (!groups[k]) groups[k] = [];
+          groups[k].push(p);
+        });
+        Object.keys(groups).forEach((k, idx) => {
+          traces.push({
+            type: 'scatter3d',
+            mode: 'markers',
+            name: k,
+            x: groups[k].map((p: any) => p.x),
+            y: groups[k].map((p: any) => p.y),
+            z: groups[k].map((p: any) => p.z),
+            marker: {
+              color: palette[idx % palette.length],
+              size: 4,
+              opacity: alpha,
+            },
+          });
+        });
+      } else {
+        traces.push({
+          type: 'scatter3d',
+          mode: 'markers',
+          x: pts.map((p: any) => p.x),
+          y: pts.map((p: any) => p.y),
+          z: pts.map((p: any) => p.z),
+          marker: {
+            color: primary,
+            size: 4,
+            opacity: alpha,
+          },
+        });
+      }
       layout.scene = {
-        xaxis: { title: chartData.x_col || 'X', color: '#94a3b8' },
-        yaxis: { title: chartData.y_col || 'Y', color: '#94a3b8' },
-        zaxis: { title: chartData.z_col || 'Z', color: '#94a3b8' },
+        xaxis: { title: chartData.x_col || 'X', color: isDarkMode ? '#94a3b8' : '#475569' },
+        yaxis: { title: chartData.y_col || 'Y', color: isDarkMode ? '#94a3b8' : '#475569' },
+        zaxis: { title: chartData.z_col || 'Z', color: isDarkMode ? '#94a3b8' : '#475569' },
       };
     } else if (type === 'surface_3d' || type === '3d_surface' || type === 'contour') {
       traces.push({
@@ -537,6 +578,377 @@ export const UniversalPlotlyChart: React.FC<UniversalPlotlyChartProps> = ({
         { type: 'line', x0: 0, x1: lags.length, y0: ci, y1: ci, line: { color: '#38bdf8', dash: 'dash' } },
         { type: 'line', x0: 0, x1: lags.length, y0: -ci, y1: -ci, line: { color: '#38bdf8', dash: 'dash' } },
       ];
+    }
+    // ── 13. EXTENDED DISTRIBUTION FORMATS (KDE, RUG, ECDF, VIOLIN) ──────────────
+    else if (type === 'kde' || type === 'kde_plot') {
+      const pts = chartData.data || [];
+      traces.push({
+        type: 'scatter',
+        mode: 'lines',
+        name: 'KDE Density',
+        x: pts.map((p: any) => p.x),
+        y: pts.map((p: any) => p.density ?? p.y),
+        line: { color: palette[1] || '#38bdf8', width: 2.5, shape: 'spline' },
+        fill: specializedSettings.kde_fill ? 'tozeroy' : 'none',
+        fillcolor: hexToRgba(palette[1] || '#38bdf8', 0.15),
+      });
+    } else if (type === 'rug' || type === 'rug_plot') {
+      const vals = chartData.data || chartData.points || [];
+      traces.push({
+        type: 'scatter',
+        mode: 'markers',
+        name: 'Rug',
+        x: vals.map((v: any) => (typeof v === 'number' ? v : Number(v.x ?? v.value ?? 0))),
+        y: vals.map(() => 0),
+        marker: { color: primary, size: 6, opacity: alpha, symbol: 'line-ns' },
+        showlegend: false,
+      });
+    } else if (type === 'ecdf' || type === 'ecdf_plot') {
+      const pts = chartData.data || [];
+      traces.push({
+        type: 'scatter',
+        mode: 'lines+markers',
+        name: 'ECDF',
+        x: pts.map((p: any) => p.x),
+        y: pts.map((p: any) => p.probability),
+        line: { color: primary, width: 2, shape: 'hv' },
+        marker: { size: 4, color: primary },
+      });
+    } else if (type === 'violin' || type === 'violin_plot') {
+      const violins = chartData.violins || [];
+      violins.forEach((v: any, idx: number) => {
+        const density = v.density || [];
+        const peak = density.reduce((acc: number, d: any) => Math.max(acc, Math.abs(d.density)), 0.00001);
+        const symm = density.map((d: any) => ({ m: -d.density / peak * 0.4, p: d.density / peak * 0.4 }));
+        const xs: number[] = [];
+        const ys: number[] = [];
+        density.forEach((d: any, i: number) => { xs.push(idx + symm[i].m); ys.push(d.val); });
+        density.slice().reverse().forEach((d: any, i: number) => {
+          const orig = density.length - 1 - i;
+          xs.push(idx + symm[orig].p);
+          ys.push(d.val);
+        });
+        traces.push({
+          type: 'scatter',
+          mode: 'lines',
+          name: v.group || `Group ${idx + 1}`,
+          x: xs,
+          y: ys,
+          line: { color: palette[idx % palette.length], width: 1.5 },
+          fill: 'toself',
+          fillcolor: hexToRgba(palette[idx % palette.length], 0.15),
+        });
+      });
+    }
+    else if (type === 'strip' || type === 'strip_plot' || type === 'swarm' || type === 'swarm_plot') {
+      const pts = chartData.data || [];
+      const groups: Record<string, any[]> = {};
+      pts.forEach((p: any) => {
+        const k = String(p.x);
+        if (!groups[k]) groups[k] = [];
+        groups[k].push(p);
+      });
+      Object.keys(groups).forEach((k, idx) => {
+        traces.push({
+          type: 'scatter',
+          mode: 'markers',
+          name: k,
+          x: groups[k].map((p: any) => idx + (p.jitter ?? 0)),
+          y: groups[k].map((p: any) => p.y),
+          marker: { color: palette[idx % palette.length], size: 6, opacity: alpha },
+        });
+      });
+      layout.xaxis = {
+        ...layout.xaxis,
+        tickmode: 'array',
+        tickvals: Object.keys(groups).map((_, i: number) => i),
+        ticktext: Object.keys(groups),
+      };
+    } else if (type === 'ridgeline' || type === 'ridgeline_plot') {
+      const ridges = chartData.ridges || [];
+      ridges.forEach((r: any, idx: number) => {
+        const density = r.density || [];
+        const offset = idx * 0.8;
+        traces.push({
+          type: 'scatter',
+          mode: 'lines',
+          name: r.category,
+          x: density.map((p: any) => p.x),
+          y: density.map((p: any) => p.y * 0.6 + offset),
+          line: { color: palette[idx % palette.length], width: 1.5 },
+          fill: specializedSettings.kde_fill !== false ? 'tonexty' : 'none',
+          fillcolor: hexToRgba(palette[idx % palette.length], 0.18),
+        });
+      });
+    } else if (type === 'waterfall' || type === 'waterfall_plot') {
+      const items = chartData.items || [];
+      const baseline = items.map((it: any) => it.start ?? 0);
+      const heights = items.map((it: any) => (it.end !== undefined ? it.end - (it.start ?? 0) : it.value));
+      const colors = items.map((it: any, i: number) => {
+        if (i === 0) return '#38bdf8';
+        const net = it.end !== undefined ? it.end - (it.start ?? 0) : it.value;
+        return net >= 0 ? '#10b981' : '#ef4444';
+      });
+      traces.push({
+        type: 'bar',
+        x: items.map((it: any) => it.label),
+        base: baseline,
+        y: heights,
+        marker: { color: colors, opacity: alpha },
+        name: 'Value',
+      });
+    } else if (type === 'funnel' || type === 'funnel_plot') {
+      const stages = chartData.stages || [];
+      const sc = specializedSettings.color?.length ? specializedSettings.color : palette;
+      traces.push({
+        type: 'funnel',
+        x: stages.map((s: any) => s.value),
+        y: stages.map((s: any) => s.stage),
+        textinfo: 'value+percent initial',
+        marker: { color: sc },
+      });
+    }
+    else if (type === 'joint' || type === 'joint_plot') {
+      const sc = chartData.scatter?.points || [];
+      traces.push({
+        type: 'scatter',
+        mode: 'markers',
+        name: 'Joint',
+        x: sc.map((p: any) => p.x),
+        y: sc.map((p: any) => p.y),
+        marker: { color: primary, size: 6, opacity: alpha },
+      });
+      if (chartData.x_marginal?.bins) {
+        traces.push({
+          type: 'bar',
+          x: (chartData.x_marginal.bins || []).map((b: any) => b.bin_center),
+          y: (chartData.x_marginal.bins || []).map((b: any) => b.count),
+          xaxis: 'x2',
+          yaxis: 'y2',
+          name: 'X Marginal',
+          marker: { color: palette[0] },
+        });
+      }
+      if (chartData.y_marginal?.bins) {
+        traces.push({
+          type: 'bar',
+          x: (chartData.y_marginal.bins || []).map((b: any) => b.count),
+          y: (chartData.y_marginal.bins || []).map((b: any) => b.bin_center),
+          xaxis: 'x3',
+          yaxis: 'y3',
+          name: 'Y Marginal',
+          orientation: 'h',
+          marker: { color: palette[1] },
+        });
+      }
+      layout.grid = {
+        rows: 2,
+        columns: 2,
+        pattern: 'independent',
+        roworder: 'top to bottom',
+      };
+    } else if (type === 'pair' || type === 'pair_plot') {
+      const cols = chartData.columns || [];
+      const rowData = chartData.matrix || [];
+      rowData.forEach((row: any, i: number) => {
+        row.forEach((cell: any, j: number) => {
+          const name = i <= j ? `xy${i + 1}_${j + 1}` : `xy${j + 1}_${i + 1}`;
+          if (cell.type === 'hist') {
+            traces.push({
+              type: 'bar',
+              x: (cell.data?.bins || []).map((b: any) => b.bin_center),
+              y: (cell.data?.bins || []).map((b: any) => b.count),
+              xaxis: name,
+              yaxis: name,
+              marker: { color: primary, opacity: alpha },
+            });
+          } else {
+            traces.push({
+              type: 'scatter',
+              mode: 'markers',
+              x: (cell.points || []).map((p: any) => p.x),
+              y: (cell.points || []).map((p: any) => p.y),
+              xaxis: name,
+              yaxis: name,
+              marker: { color: primary, size: 4, opacity: alpha },
+            });
+          }
+        });
+      });
+      layout.grid = {
+        rows: cols.length,
+        columns: cols.length,
+        pattern: 'independent',
+      };
+      layout.xaxis = { title: { text: cols[0] || '', font: { size: 10 } } };
+      layout.yaxis = { title: { text: cols[0] || '', font: { size: 10 } } };
+    } else if (type === 'hexbin' || type === 'hexbin_plot' || type === 'density' || type === 'density_plot') {
+      traces.push({
+        type: 'histogram2dcontour',
+        x: (chartData.bins || []).map((b: any) => b.x),
+        y: (chartData.bins || []).map((b: any) => b.y),
+        name: '2D Density',
+        colorscale: colorControls.palette === 'coolwarm' ? 'RdBu' : 'Viridis',
+        showscale: true,
+      });
+    }
+    else if (type === 'sankey' || type === 'sankey_diagram') {
+      traces.push({
+        type: 'sankey',
+        node: {
+          label: (chartData.nodes || []).map((n: any) => n.name),
+          color: palette,
+          pad: 12,
+          thickness: 16,
+        },
+        link: {
+          source: (chartData.links || []).map((l: any) => l.source),
+          target: (chartData.links || []).map((l: any) => l.target),
+          value: (chartData.links || []).map((l: any) => l.value),
+        },
+        orientation: 'v',
+      });
+    } else if (type === 'chord' || type === 'chord_diagram' || type === 'network' || type === 'network_graph') {
+      const hasPositions = (chartData.nodes || []).some((n: any) => n.x !== undefined && n.y !== undefined);
+      if (!hasPositions) {
+        // Flow-style fallback (sankey-like) when no explicit coordinates exist
+        traces.push({
+          type: 'sankey',
+          node: {
+            label: (chartData.nodes || []).map((n: any) => n.name),
+            color: palette,
+            pad: 12,
+            thickness: 16,
+          },
+          link: {
+            source: (chartData.links || []).map((l: any) => l.source),
+            target: (chartData.links || []).map((l: any) => l.target),
+            value: (chartData.links || []).map((l: any) => l.value),
+          },
+          orientation: 'h',
+        });
+      } else {
+        // Network layout using scatter points + line segments
+        const nodePos = new Map<string, any>((chartData.nodes || []).map((n: any) => [String(n.id ?? n.name), n]));
+        const linkPts: { x: number; y: number }[] = [];
+        (chartData.links || []).forEach((l: any) => {
+          const s: any = nodePos.get(l.source) || nodePos.get(String(l.source));
+          const t: any = nodePos.get(l.target) || nodePos.get(String(l.target));
+          if (s && t) {
+            linkPts.push({ x: s.x, y: s.y }, { x: t.x, y: t.y });
+          }
+        });
+        traces.push({
+          type: 'scatter',
+          mode: 'lines',
+          name: 'Edges',
+          x: linkPts.map((p) => p.x),
+          y: linkPts.map((p) => p.y),
+          line: { color: isDarkMode ? '#64748b' : '#94a3b8', width: 1.2, shape: 'spline' },
+          hoverinfo: 'skip',
+        });
+        traces.push({
+          type: 'scatter',
+          mode: 'markers+text',
+          name: 'Nodes',
+          x: (chartData.nodes || []).map((n: any) => n.x),
+          y: (chartData.nodes || []).map((n: any) => n.y),
+          text: (chartData.nodes || []).map((n: any) => n.name),
+          textposition: 'top center',
+          marker: { color: palette, size: 10, opacity: alpha },
+        });
+        layout.xaxis = { showgrid: false, zeroline: false, visible: false };
+        layout.yaxis = { showgrid: false, zeroline: false, visible: false };
+      }
+    } else if (type === 'wordcloud' || type === 'word_cloud') {
+      const tags = chartData.tags || [];
+      traces.push({
+        type: 'bar',
+        x: tags.map((t: any) => t.text),
+        y: tags.map((t: any) => t.value),
+        name: 'Word Frequencies',
+        marker: {
+          color: tags.map((_: any, i: number) => palette[i % palette.length]),
+          opacity: alpha,
+        },
+      });
+    }
+    else if (type === 'geographic_map' || type === 'geo_map' || type === 'choropleth_map' || type === 'choropleth') {
+      const pts = chartData.points || [];
+      const isChoro = type.startsWith('choropleth');
+      if (isChoro) {
+        traces.push({
+          type: 'choropleth',
+          locationmode: 'country names',
+          locations: pts.map((p: any) => p.location),
+          z: pts.map((p: any) => p.value),
+          text: pts.map((p: any) => `${p.location}: ${p.value}`),
+          colorscale: colorControls.palette === 'coolwarm' ? 'RdBu' : 'Viridis',
+          reversescale: colorControls.palette === 'coolwarm',
+          colorbar: { title: { text: chartData.size_col || 'Value' } },
+        });
+      } else {
+        traces.push({
+          type: 'scattergeo',
+          locationmode: 'country names',
+          locations: pts.map((p: any) => p.location),
+          text: pts.map((p: any) => `${p.location}: ${p.value}`),
+          mode: 'markers+text',
+          marker: {
+            size: pts.map((p: any) => Math.max(6, Math.min(30, Math.sqrt(Math.abs(Number(p.value) || 0)) * 2))),
+            color: primary,
+            opacity: alpha,
+            line: { color: '#ffffff', width: 0.5 },
+          },
+        });
+      }
+      layout.geo = {
+        bgcolor: 'transparent',
+        framecolor: isDarkMode ? '#334155' : '#e2e8f0',
+        showland: true,
+        landcolor: isDarkMode ? '#1e293b' : '#f1f5f9',
+        coastlinecolor: isDarkMode ? '#334155' : '#94a3b8',
+        showocean: true,
+        oceancolor: isDarkMode ? '#0f172a' : '#e0f2fe',
+        showcountries: true,
+      };
+    } else if (type === 'parallel_coordinates' || type === 'parallel_coord') {
+      const dims = (chartData.dimensions || []).map((d: any) => ({
+        label: d.name,
+        values: (chartData.records || []).map((r: any) => r[d.name]),
+        range: [d.min, d.max],
+      }));
+      traces.push({
+        type: 'parcoords',
+        line: {
+          color: (chartData.records || []).map((_: any, i: number) => i),
+          colorscale: colorControls.palette === 'coolwarm' ? 'RdBu' : 'Viridis',
+        },
+        dimensions: dims,
+      });
+    } else if (type === 'lag' || type === 'lag_plot') {
+      const pts = chartData.points || [];
+      traces.push({
+        type: 'scatter',
+        mode: 'markers',
+        name: 'Lag',
+        x: pts.map((p: any) => p.y_lag),
+        y: pts.map((p: any) => p.y_t),
+        marker: { color: primary, size: 5, opacity: alpha },
+      });
+      const xs = pts.map((p: any) => p.y_lag);
+      if (xs.length) {
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        traces.push({
+          type: 'scatter',
+          mode: 'lines',
+          name: 'y = x',
+          x: [minX, maxX],
+          y: [minX, maxX],
+          line: { color: isDarkMode ? '#64748b' : '#94a3b8', width: 1.5, dash: 'dash' },
+        });
+      }
     }
     // ── 13. FALLBACK FOR OTHER TYPES ─────────────────────────────────────────
     else {
