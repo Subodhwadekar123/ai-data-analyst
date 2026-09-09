@@ -29,10 +29,15 @@ export interface DatasetInfo {
   rows: number;
   columns: number;
   shape: number[];
+  memory_usage_bytes?: number;
   memory_usage_mb: number;
   missing_values_total: number;
+  missing_columns?: number;
+  missing_info: Record<string, { count: number; percentage: number }>;
   duplicate_rows: number;
+  duplicate_percentage?: number;
   completeness_score: number;
+  unique_counts?: Record<string, number>;
   column_types: {
     numeric: string[];
     categorical: string[];
@@ -41,8 +46,12 @@ export interface DatasetInfo {
   };
   column_details: ColumnDetail[];
   target_suggestions: string[];
-  missing_info: Record<string, { count: number; percentage: number }>;
   has_datetime: boolean;
+  is_time_series?: boolean;
+  // ── Optional legacy flat aliases (present on older payloads) ───────────────
+  column_names?: string[];
+  numeric_columns?: string[];
+  categorical_columns?: string[];
 }
 
 export interface ColumnDetail {
@@ -103,6 +112,7 @@ interface AppStore {
   datasets: UploadedDataset[];
   addDataset: (dataset: UploadedDataset) => void;
   removeDataset: (id: string) => void;
+  setDatasets: (list: UploadedDataset[]) => void;
 
   // Sidebar state
   sidebarCollapsed: boolean;
@@ -159,6 +169,17 @@ export const useStore = create<AppStore>()(
           datasets: s.datasets.filter((d) => d.id !== id),
           activeDataset: s.activeDataset?.id === id ? null : s.activeDataset,
         })),
+      // Replace the full dataset list while preserving the currently-active dataset.
+      // Used by layout sync (avoids addDataset's always-activate behavior in bulk).
+      setDatasets: (list) =>
+        set((s) => {
+          const activeId = s.activeDataset?.id;
+          const stillActive = list.find((d) => d.id === activeId);
+          return {
+            datasets: list,
+            activeDataset: stillActive ?? (list.length > 0 ? list[0] : null),
+          };
+        }),
 
       // Sidebar
       sidebarCollapsed: false,
@@ -220,6 +241,8 @@ export const useStore = create<AppStore>()(
         token: state.token,
         user: state.user,
         sessionId: state.sessionId,
+        datasets: state.datasets,
+        activeDataset: state.activeDataset,
       }),
     }
   )

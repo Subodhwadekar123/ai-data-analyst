@@ -11,64 +11,57 @@ import { listDatasets, getDataset } from '../../services/api';
 import ErrorBoundary from '../ui/ErrorBoundary';
 
 const DashboardLayout: React.FC = () => {
-  const { sidebarCollapsed, datasets, activeDataset, addDataset, setActiveDataset, setSidebarCollapsed } = useStore();
+  const { sidebarCollapsed, datasets, setDatasets } = useStore();
   const location = useLocation();
   const isMobile = useIsMobile();
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
+  const didSync = React.useRef(false);
 
   React.useEffect(() => {
+    if (didSync.current) return;
+    didSync.current = true;
+
     const syncDatasets = async () => {
+      // Always honor what the user has already (persisted across reloads).
+      const localIds = new Set(datasets.map((d) => d.id));
+      let backendList: any[] = [];
       try {
         const res = await listDatasets();
-        const backendList = res.datasets || [];
-        
-        // Load details for datasets not present in local store
-        for (const item of backendList) {
-          const alreadyStored = datasets.some(d => d.id === item.id);
-          if (!alreadyStored) {
-            try {
-              const fullDetails = await getDataset(item.id);
-              const mapped: any = {
-                id: fullDetails.dataset_id,
-                filename: fullDetails.filename,
-                file_size_mb: item.file_size_mb,
-                file_type: fullDetails.file_type,
-                dataset_info: fullDetails.dataset_info,
-                preview: fullDetails.preview,
-                uploaded_at: fullDetails.created_at,
-              };
-              addDataset(mapped);
-            } catch (err) {
-              console.error(`Failed to fetch details for dataset ${item.id}`, err);
-            }
-          }
-        }
-
-        // Set active dataset if not set and datasets are available
-        if (!activeDataset && backendList.length > 0) {
-          try {
-            const firstId = backendList[0].id;
-            const fullDetails = await getDataset(firstId);
-            const mapped: any = {
-              id: fullDetails.dataset_id,
-              filename: fullDetails.filename,
-              file_size_mb: backendList[0].file_size_mb,
-              file_type: fullDetails.file_type,
-              dataset_info: fullDetails.dataset_info,
-              preview: fullDetails.preview,
-              uploaded_at: fullDetails.created_at,
-            };
-            setActiveDataset(mapped);
-          } catch (err) {
-            console.error("Failed to auto-set active dataset", err);
-          }
-        }
+        backendList = res.datasets || [];
       } catch (err) {
-        console.error("Failed to sync datasets list from backend", err);
+        console.error('Failed to sync datasets list from backend', err);
+        // Keep persisted datasets — do NOT clear them on a network/auth error.
+        return;
+      }
+
+      const merged = [...datasets];
+      // Load full details for backend items missing from local store
+      const missing = backendList.filter((item) => !localIds.has(item.id));
+      for (const item of missing) {
+        try {
+          const fullDetails = await getDataset(item.id);
+          const mapped: any = {
+            id: fullDetails.dataset_id ?? fullDetails.id ?? item.id,
+            filename: fullDetails.filename,
+            file_size_mb: item.file_size_mb,
+            file_type: fullDetails.file_type,
+            dataset_info: fullDetails.dataset_info,
+            preview: fullDetails.preview,
+            uploaded_at: fullDetails.created_at ?? fullDetails.uploaded_at,
+          };
+          merged.push(mapped);
+        } catch (err) {
+          console.error(`Failed to fetch details for dataset ${item.id}`, err);
+        }
+      }
+
+      // Always publish once — preserves active selection by id, defaults to first.
+      if (merged.length > 0) {
+        setDatasets(merged);
       }
     };
     syncDatasets();
-  }, []); // Run once on layout mount
+  }, [datasets, setDatasets]); // didSync ref guard keeps this a true one-time mount sync
 
   // Close mobile nav on route change
   React.useEffect(() => {

@@ -104,7 +104,7 @@ const VISUALIZATION_CATALOG: VisualizationCatalogItem[] = [
 ];
 
 export default function VisualizationPage() {
-  const { activeDataset } = useStore();
+  const { activeDataset, datasets, setActiveDataset } = useStore();
   const isMobile = useIsMobile();
 
   // ── Visualization Selection & State ─────────────────────────────────────────
@@ -177,10 +177,19 @@ export default function VisualizationPage() {
   const exportFnsRef = useRef<any>(null);
   const chartWrapperRef = useRef<HTMLDivElement>(null);
 
-  // Available dataset columns
-  const numericColumns = activeDataset?.dataset_info?.numeric_columns || [];
-  const categoricalColumns = activeDataset?.dataset_info?.categorical_columns || [];
-  const allColumns = activeDataset?.dataset_info?.column_names || [];
+  // Available dataset columns — read the canonical `column_types` shape emitted
+  // by the backend, with fallbacks for legacy flat `column_names` payloads.
+  const dsInfo = activeDataset?.dataset_info;
+  const numericColumns = dsInfo?.column_types?.numeric ?? dsInfo?.numeric_columns ?? [];
+  const categoricalColumns = dsInfo?.column_types?.categorical ?? dsInfo?.categorical_columns ?? [];
+  const allColumns =
+    dsInfo?.column_names ??
+    [
+      ...(dsInfo?.column_types?.numeric ?? []),
+      ...(dsInfo?.column_types?.categorical ?? []),
+      ...(dsInfo?.column_types?.datetime ?? []),
+      ...(dsInfo?.column_types?.boolean ?? []),
+    ];
 
   // Snapshot current visual state
   const captureState = useCallback(() => {
@@ -281,6 +290,18 @@ export default function VisualizationPage() {
       setLoadingRecs(false);
     }
   };
+
+  useEffect(() => {
+    if (activeDataset) return;
+    if (datasets.length > 0 && !activeDataset) {
+      // Persisted datasets are available but no active selection yet — restore it.
+      const desired = datasets.find((d) => d.id === (typeof window !== 'undefined' ? localStorage.getItem('last_active_dataset') : null)) || datasets[0];
+      setActiveDataset(desired);
+      try {
+        localStorage.setItem('last_active_dataset', desired.id);
+      } catch { /* storage may be unavailable */ }
+    }
+  }, [activeDataset, datasets, setActiveDataset]);
 
   useEffect(() => {
     if (activeDataset) {
