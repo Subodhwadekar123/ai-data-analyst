@@ -56,18 +56,32 @@ def register_user(
     Register a new user account.
     Sends email verification. Account is inactive until email is verified.
     """
-    # Email uniqueness check
-    if db.query(UserRecord).filter(UserRecord.email == email.lower()).first():
-        # pyrefly: ignore [missing-import]
-        from fastapi import HTTPException, status
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="An account with this email address already exists."
-        )
+    # Email uniqueness check — soft-deleted accounts do not reserve their email.
+    # The DB has a hard UNIQUE constraint on users.email, so when the only row
+    # holding the address is soft-deleted, free it in place (rename with a
+    # unique tombstone prefix) before inserting the fresh account. This also
+    # transparently handles soft-deleted rows created before this change.
+    existing = db.query(UserRecord).filter(UserRecord.email == email.lower()).first()
+    if existing:
+        if existing.is_deleted:
+            tombstone = f"deleted_{uuid.uuid4().hex[:8]}"
+            existing.email = f"{tombstone}_{existing.email}"
+            existing.username = None  # free the username too (NULLs bypass UNIQUE)
+            db.commit()
+        else:
+            # pyrefly: ignore [missing-import]
+            from fastapi import HTTPException, status
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="An account with this email address already exists."
+            )
 
-    # Username uniqueness check (if provided)
+    # Username uniqueness check (if provided) — same soft-delete exemption
     if username:
-        if db.query(UserRecord).filter(UserRecord.username == username).first():
+        if db.query(UserRecord).filter(
+            UserRecord.username == username,
+            UserRecord.is_deleted == False,  # noqa: E712
+        ).first():
             # pyrefly: ignore [missing-import]
             from fastapi import HTTPException, status
             raise HTTPException(

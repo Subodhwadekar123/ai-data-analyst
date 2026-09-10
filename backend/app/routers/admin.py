@@ -470,6 +470,8 @@ async def permanent_delete_user(
     user = db.query(UserRecord).filter(UserRecord.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
+    if user.is_admin:
+        raise HTTPException(status_code=403, detail="Cannot permanently delete admin accounts.")
     if admin.id == user_id:
         raise HTTPException(status_code=400, detail="Cannot delete your own account.")
 

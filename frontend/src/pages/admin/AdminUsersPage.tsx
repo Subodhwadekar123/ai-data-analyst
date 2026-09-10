@@ -16,7 +16,7 @@ import {
 import { useStore } from '../../store/useStore';
 import {
   listUsers, suspendUser, activateUser, lockAccount, unlockAccount,
-  softDeleteUser, changeUserRole, manuallyVerifyEmail,
+  softDeleteUser, permanentDeleteUser, changeUserRole, manuallyVerifyEmail,
   forceLogoutUser, adminResetPassword
 } from '../../services/adminApi';
 
@@ -57,6 +57,8 @@ const AdminUsersPage: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [suspendReason, setSuspendReason] = useState('');
   const [showSuspendModal, setShowSuspendModal] = useState(false);
+  const [showPermanentDeleteModal, setShowPermanentDeleteModal] = useState(false);
+  const [permanentDeleteConfirm, setPermanentDeleteConfirm] = useState('');
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const currentUserId = useStore((s) => s.user?.id);
@@ -262,6 +264,56 @@ const AdminUsersPage: React.FC = () => {
         )}
       </AnimatePresence>
 
+      {/* Permanent Delete Modal — requires typing the user's email to confirm */}
+      <AnimatePresence>
+        {showPermanentDeleteModal && selectedUser && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            onClick={() => setShowPermanentDeleteModal(false)}>
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
+              style={{ background: '#1e2235', border: '1px solid rgba(239,68,68,0.35)', borderRadius: '16px', padding: '28px', maxWidth: '420px', width: '90%' }}
+              onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                <AlertTriangle size={22} color="#ef4444" />
+                <h3 style={{ color: '#f1f5f9', fontWeight: 800, margin: 0, fontSize: '18px' }}>Permanently Delete User?</h3>
+              </div>
+              <p style={{ color: '#94a3b8', fontSize: '13px', lineHeight: 1.6, marginBottom: '6px' }}>
+                You are about to <strong style={{ color: '#f87171' }}>permanently delete</strong>{' '}
+                <strong style={{ color: '#e2e8f0' }}>{selectedUser.full_name || selectedUser.email}</strong>{' '}
+                (<span style={{ color: '#a5b4fc' }}>{selectedUser.email}</span>).
+              </p>
+              <p style={{ color: '#f87171', fontSize: '13px', fontWeight: 600, marginBottom: '16px' }}>
+                This is irreversible. All their data — sessions, login history, datasets and account record — will be wiped. The email will be freed for fresh registration.
+              </p>
+              <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '6px' }}>
+                Type <strong style={{ color: '#e2e8f0' }}>{selectedUser.email}</strong> to confirm:
+              </label>
+              <input value={permanentDeleteConfirm}
+                onChange={(e) => setPermanentDeleteConfirm(e.target.value)}
+                placeholder={selectedUser.email}
+                autoComplete="off"
+                style={{ ...inputStyle, borderColor: permanentDeleteConfirm === selectedUser.email ? 'rgba(16,185,129,0.5)' : 'rgba(239,68,68,0.4)' }} />
+              <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                <button onClick={() => setShowPermanentDeleteModal(false)}
+                  style={{ flex: 1, padding: '10px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: '#94a3b8', cursor: 'pointer', fontWeight: 600 }}>
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (permanentDeleteConfirm !== selectedUser.email) return;
+                    setShowPermanentDeleteModal(false);
+                    act(() => permanentDeleteUser(selectedUser.id), 'User permanently deleted.');
+                  }}
+                  disabled={permanentDeleteConfirm !== selectedUser.email}
+                  style={{ flex: 1, padding: '10px', background: permanentDeleteConfirm === selectedUser.email ? 'rgba(239,68,68,0.25)' : 'rgba(239,68,68,0.08)', border: `1px solid ${permanentDeleteConfirm === selectedUser.email ? 'rgba(239,68,68,0.6)' : 'rgba(239,68,68,0.2)'}`, borderRadius: '10px', color: permanentDeleteConfirm === selectedUser.email ? '#f87171' : '#7f1d1d', cursor: permanentDeleteConfirm === selectedUser.email ? 'pointer' : 'not-allowed', fontWeight: 700 }}>
+                  Delete Forever
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
 
       {/* ── Actions Dropdown (rendered via portal to document.body) ─────────────
@@ -288,6 +340,7 @@ const AdminUsersPage: React.FC = () => {
                 selectedUser.is_admin && selectedUser.id !== currentUserId && { icon: <Users size={14} />, label: 'Remove Admin', action: () => act(() => changeUserRole(selectedUser.id, 'user'), 'Role changed to user.'), color: '#94a3b8' },
                 { icon: <LogOut size={14} />, label: 'Force Logout', action: () => act(() => forceLogoutUser(selectedUser.id), 'User logged out.'), color: '#64748b' },
                 !selectedUser.is_admin && { icon: <Trash2 size={14} />, label: 'Delete User', action: () => act(() => softDeleteUser(selectedUser.id), 'User deleted.'), color: '#ef4444' },
+                !selectedUser.is_admin && { icon: <AlertTriangle size={14} />, label: 'Permanently Delete', action: () => { setPermanentDeleteConfirm(''); setShowPermanentDeleteModal(true); setOpenMenu(null); }, color: '#dc2626' },
               ].filter(Boolean).map((item: any, i) => (
                 <button key={i} onClick={item.action}
                   style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 10px', background: 'none', border: 'none', borderRadius: '8px', cursor: 'pointer', color: item.color, fontSize: '13px', fontWeight: 600, textAlign: 'left' }}>
