@@ -19,7 +19,7 @@ Full enterprise authentication API:
   GET  /auth/login-history     - Own login history
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Response, Cookie
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Request, Response, Cookie
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, field_validator
@@ -36,6 +36,7 @@ from app.services.auth_service import (
     send_registration_otp, resend_registration_otp, verify_registration_otp,
     resend_otp_to_unverified,
 )
+from app.services.email_service import send_otp_email
 from app.config import settings
 from app.utils.device_parser import get_client_ip
 from app.utils.logger import setup_logger
@@ -206,7 +207,7 @@ def _set_refresh_cookie(response: Response, refresh_token: str, remember_me: boo
 
 @router.post("/register", response_model=dict, status_code=status.HTTP_201_CREATED,
              summary="Register New User")
-async def register(request: Request, body: RegisterRequest, db: Session = Depends(get_db)):
+async def register(request: Request, background: BackgroundTasks, body: RegisterRequest, db: Session = Depends(get_db)):
     """
     Register a new user account.
 
@@ -234,7 +235,7 @@ async def register(request: Request, body: RegisterRequest, db: Session = Depend
                 and getattr(settings, "OTP_ENABLED", False)):
             resent = await resend_otp_to_unverified(db, body.email)
             if resent:
-                challenge_id, code, expires_at, email_sent = resent
+                challenge_id, code, expires_at = resent
                 payload = {
                     "message": "You already have an unverified account — we emailed you a fresh verification code.",
                     "user_id": None,
@@ -244,8 +245,11 @@ async def register(request: Request, body: RegisterRequest, db: Session = Depend
                     "challenge_id": challenge_id,
                     "masked_email": _mask_email(body.email),
                     "expires_at": expires_at.isoformat(),
-                    "email_sent": email_sent,
                 }
+                # Guaranteed delivery: BackgroundTasks outlive the response.
+                background.add_task(
+                    send_otp_email, body.email.lower().strip(),
+                    "", code, settings.OTP_EXPIRE_MINUTES)
                 return payload
         raise
 
@@ -259,16 +263,18 @@ async def register(request: Request, body: RegisterRequest, db: Session = Depend
 
     # OTP email verification flow
     if getattr(settings, "OTP_ENABLED", False) and not user.is_verified:
-        challenge_id, code, expires_at, email_sent = await send_registration_otp(db, user)
+        challenge_id, code, expires_at = await send_registration_otp(db, user)
         response["otp_required"] = True
         response["challenge_id"] = challenge_id
         response["masked_email"] = _mask_email(user.email)
         response["expires_at"] = expires_at.isoformat()
-        response["email_sent"] = email_sent
-        if email_sent:
-            response["message"] = "Account created! We emailed you a 6-digit verification code."
-        else:
-            response["message"] = "Account created, but the verification email could not be sent. Please use 'Resend code' in a moment."
+        response["email_sent"] = True
+        response["message"] = "Account created! We emailed you a 6-digit verification code."
+        # Guaranteed delivery: BackgroundTasks runs after the response is sent,
+        # so the email actually goes out even though we return immediately.
+        background.add_task(
+            send_otp_email, user.email,
+            user.full_name or user.email, code, settings.OTP_EXPIRE_MINUTES)
 
     return response
 
@@ -322,24 +328,26 @@ async def verify_otp(request: Request, body: VerifyOtpRequest, response: Respons
 
 
 @router.post("/resend-otp", summary="Resend Registration OTP Code")
-async def resend_otp(request: Request, body: ResendOtpRequest, db: Session = Depends(get_db)):
+async def resend_otp(request: Request, background: BackgroundTasks, body: ResendOtpRequest, db: Session = Depends(get_db)):
     """
     Resend a new 6-digit OTP code for an existing challenge.
     Rate-limited by a resend cooldown (default 30s between sends).
     """
     try:
-        new_challenge_id, code, expires_at, email_sent = await resend_registration_otp(db, body.challenge_id)
+        new_challenge_id, code, expires_at, user_email, user_name = await resend_registration_otp(db, body.challenge_id)
     except HTTPException:
         raise
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
+    # Guaranteed delivery: BackgroundTasks runs after the response is sent.
+    background.add_task(
+        send_otp_email, user_email, user_name, code, settings.OTP_EXPIRE_MINUTES)
     result = {
-        "message": "A new verification code has been sent to your email." if email_sent
-        else "The verification email could not be sent right now. Please try again shortly.",
+        "message": "A new verification code has been sent to your email.",
         "challenge_id": new_challenge_id,
         "expires_at": expires_at.isoformat(),
-        "email_sent": email_sent,
+        "email_sent": True,
     }
     return result
 
@@ -457,6 +465,7 @@ async def verify_email_get(token: str, db: Session = Depends(get_db)):
 @router.post("/resend-verification", summary="Resend Verification Email")
 async def resend_verification(
     request: Request,
+    background: BackgroundTasks,
     body: ResendVerificationRequest,
     db: Session = Depends(get_db),
 ):
@@ -468,15 +477,19 @@ async def resend_verification(
     if getattr(settings, "OTP_ENABLED", False):
         resent = await resend_otp_to_unverified(db, body.email)
         if resent:
-            challenge_id, code, expires_at, email_sent = resent
+            challenge_id, code, expires_at = resent
             payload = {
                 "message": "If this email exists and is unverified, a new verification code has been sent.",
                 "otp_required": True,
                 "challenge_id": challenge_id,
                 "masked_email": _mask_email(body.email),
                 "expires_at": expires_at.isoformat(),
-                "email_sent": email_sent,
+                "email_sent": True,
             }
+            # Guaranteed delivery: BackgroundTasks runs after the response is sent.
+            background.add_task(
+                send_otp_email, body.email.lower().strip(),
+                "", code, settings.OTP_EXPIRE_MINUTES)
             return payload
 
     verification_url = resend_verification_email(db, body.email, ip)

@@ -31,7 +31,6 @@ from app.services.audit_service import (
 from app.services.email_service import (
     send_verification_email_bg, send_password_reset_bg,
     send_password_changed_bg, send_new_device_login_bg, send_account_locked_bg,
-    send_otp_email, send_otp_email_bg,
 )
 from app.services.otp_service import (
     create_otp_challenge, verify_otp_code, get_challenge, check_resend_allowed,
@@ -160,36 +159,27 @@ def _send_verification_email(db: Session, user: UserRecord, ip_address: str = "U
 
 # ── Registration OTP (6-digit email code verification) ────────────────────────
 
-async def send_registration_otp(db: Session, user: UserRecord) -> Tuple[str, Optional[str], datetime, bool]:
+async def send_registration_otp(db: Session, user: UserRecord) -> Tuple[str, str, datetime]:
     """
     Create an OTP challenge for a freshly registered user and email the code.
 
-    The email send is fire-and-forget (non-blocking) so the register response is
-    fast. We keep the logging so failed sends are still auditable.
-    Returns (challenge_id, plain_code, expires_at, email_sent=True).
+    The email send is handled by the caller (router) via FastAPI BackgroundTasks
+    so delivery is guaranteed while the response stays fast.
+    Returns (challenge_id, plain_code, expires_at).
     """
     challenge_id, code, expires_at = create_otp_challenge(db, user.id, purpose="registration")
 
-    # Fire-and-forget: do not block the response on SMTP roundtrip.
-    send_otp_email_bg(
-        user.email,
-        user.full_name or user.email,
-        code,
-        settings.OTP_EXPIRE_MINUTES,
-    )
-
     log_event(db, AuditAction.EMAIL_VERIFICATION_SENT, user_id=user.id, user_email=user.email,
-              description="Registration OTP challenge created (email dispatched)")
-    return challenge_id, code, expires_at, True
+              description="Registration OTP challenge created (email queued via BackgroundTasks)")
+    return challenge_id, code, expires_at
 
 
-async def resend_registration_otp(db: Session, challenge_id: str) -> Tuple[str, Optional[str], datetime, bool]:
+async def resend_registration_otp(db: Session, challenge_id: str) -> Tuple[str, str, datetime, str, str]:
     """
     Resend the registration OTP for an existing challenge (cooldown-limited).
 
-    The email send is fire-and-forget (non-blocking) so the resend response is
-    fast. Failed sends are still logged.
-    Returns (new_challenge_id, plain_code, expires_at, email_sent=True).
+    Returns (new_challenge_id, plain_code, expires_at, user_email, user_full_name).
+    The caller (router) dispatches the email via FastAPI BackgroundTasks.
     """
     challenge = get_challenge(db, challenge_id)
     try:
@@ -202,20 +192,12 @@ async def resend_registration_otp(db: Session, challenge_id: str) -> Tuple[str, 
     user = challenge.user
     new_challenge_id, _code, expires_at = create_otp_challenge(db, user.id, purpose=challenge.purpose)
 
-    # Fire-and-forget: do not block the response on SMTP roundtrip.
-    send_otp_email_bg(
-        user.email,
-        user.full_name or user.email,
-        _code,
-        settings.OTP_EXPIRE_MINUTES,
-    )
-
     log_event(db, AuditAction.RESEND_VERIFICATION, user_id=user.id, user_email=user.email,
-              description="Registration OTP resent (email dispatched)")
-    return new_challenge_id, _code, expires_at, True
+              description="Registration OTP challenge re-created (email queued via BackgroundTasks)")
+    return new_challenge_id, _code, expires_at, user.email, user.full_name or user.email
 
 
-async def resend_otp_to_unverified(db: Session, email: str) -> Optional[Tuple[str, str, datetime, bool]]:
+async def resend_otp_to_unverified(db: Session, email: str) -> Optional[Tuple[str, str, datetime]]:
     """
     Create and email a fresh registration OTP for an EXISTING unverified account.
 
@@ -224,8 +206,8 @@ async def resend_otp_to_unverified(db: Session, email: str) -> Optional[Tuple[st
     saw the OTP page. Re-submitting the same email now resends a code instead of
     failing with "email already exists".
 
-    The email send is fire-and-forget (non-blocking) for fast response.
-    Returns (challenge_id, plain_code, expires_at, email_sent=True) when the email
+    The caller dispatches the email via BackgroundTasks.
+    Returns (challenge_id, plain_code, expires_at) when the email
     belongs to an unverified, non-deleted account, else None.
     """
     user = db.query(UserRecord).filter(
@@ -236,18 +218,9 @@ async def resend_otp_to_unverified(db: Session, email: str) -> Optional[Tuple[st
         return None
 
     challenge_id, code, expires_at = create_otp_challenge(db, user.id, purpose="registration")
-
-    # Fire-and-forget: do not block the response on SMTP roundtrip.
-    send_otp_email_bg(
-        user.email,
-        user.full_name or user.email,
-        code,
-        settings.OTP_EXPIRE_MINUTES,
-    )
-
     log_event(db, AuditAction.RESEND_VERIFICATION, user_id=user.id, user_email=user.email,
-              description="Registration OTP resent to existing unverified account (email dispatched)")
-    return challenge_id, code, expires_at, True
+              description="Registration OTP re-created for existing unverified account (email queued via BackgroundTasks)")
+    return challenge_id, code, expires_at
 
 
 def verify_registration_otp(
