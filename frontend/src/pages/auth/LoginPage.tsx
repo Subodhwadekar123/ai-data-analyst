@@ -8,7 +8,7 @@
  *  - Responsive, dark glassmorphism design
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -46,6 +46,23 @@ const LoginPage: React.FC = () => {
     toast.success(customUrlInput ? 'Backend URL updated!' : 'Reset to default backend URL');
     window.location.reload();
   };
+
+  // ── Backend warm-up ping ────────────────────────────────────────────────────
+  // Free-tier backends (Render, etc.) sleep when idle. Ping a lightweight
+  // health endpoint as soon as the page loads so the server is already
+  // awake by the time the user clicks "Login". Without this, the first
+  // login attempt can fail while the backend is still booting.
+  useEffect(() => {
+    const warmUp = async () => {
+      try {
+        await fetch(`${getApiBaseUrl()}/health`, { method: 'GET', mode: 'cors' });
+      } catch {
+        // Ignore — warm-up is best-effort. The login retry logic in
+        // services/authApi.ts handles any remaining cold-start delay.
+      }
+    };
+    warmUp();
+  }, []);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();

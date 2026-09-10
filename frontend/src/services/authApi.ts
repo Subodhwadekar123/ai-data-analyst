@@ -98,10 +98,34 @@ authApi.interceptors.response.use(
       }
     }
 
+    // ── Cold-start retry for sleeping/slow backends ─────────────────────────
+    // Free-tier backends (Render, etc.) sleep when idle. The first request
+    // fails with a network error while the server boots. Retry a few times
+    // with a delay instead of failing instantly.
+    const isNetworkError =
+      error.message === 'Network Error' || error.code === 'ERR_NETWORK' || !error.response;
+    const isTimeout = error.code === 'ECONNABORTED';
+
+    if ((isNetworkError || isTimeout) && originalRequest) {
+      const retries = (originalRequest._coldRetryCount as number) || 0;
+      if (retries < 3) {
+        originalRequest._coldRetryCount = retries + 1;
+        await new Promise((r) => setTimeout(r, 3000));
+        try {
+          return await authApi(originalRequest);
+        } catch (retryError: any) {
+          error = retryError;
+          // fall through to final message below
+        }
+      }
+    }
+
     let message = error.response?.data?.detail;
     if (!message) {
       if (error.message === 'Network Error' || error.code === 'ERR_NETWORK' || !error.response) {
-        message = 'Unable to connect to the backend server. Please verify your backend server is running and accessible.';
+        message = 'Unable to connect to the backend server. If this is the first request in a while, the backend may be starting up — please try again in a few seconds.';
+      } else if (error.code === 'ECONNABORTED') {
+        message = 'The backend took too long to respond (it may be starting up). Please try again.';
       } else {
         message = error.message || 'An error occurred';
       }
