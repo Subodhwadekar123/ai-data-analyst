@@ -3,7 +3,8 @@
  * Full CRUD user management with search, filters, inline actions, and modals.
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import {
@@ -12,6 +13,7 @@ import {
   Mail, LogOut, Eye, Loader2, ChevronLeft, ChevronRight,
   Key, Edit3, CheckCircle, XCircle, AlertTriangle
 } from 'lucide-react';
+import { useStore } from '../../store/useStore';
 import {
   listUsers, suspendUser, activateUser, lockAccount, unlockAccount,
   softDeleteUser, changeUserRole, manuallyVerifyEmail,
@@ -55,6 +57,9 @@ const AdminUsersPage: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [suspendReason, setSuspendReason] = useState('');
   const [showSuspendModal, setShowSuspendModal] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const currentUserId = useStore((s) => s.user?.id);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -89,6 +94,41 @@ const AdminUsersPage: React.FC = () => {
   };
 
   const totalPages = Math.ceil(total / LIMIT);
+
+  // ── Actions menu (portal) open/close ─────────────────────────────────────────
+  // The dropdown is rendered through a portal to document.body with fixed
+  // positioning: the table card (.glow-card) has `overflow: hidden !important`
+  // and `z-index: 1`, which would otherwise CLIP the menu and trap it under
+  // the page's stacking order — making the action options unclickable.
+  const MENU_WIDTH = 190;
+  const toggleMenu = (u: AdminUser, btn: HTMLElement) => {
+    if (openMenu === u.id) { setOpenMenu(null); return; }
+    const rect = btn.getBoundingClientRect();
+    const left = Math.max(8, Math.min(rect.right - MENU_WIDTH, window.innerWidth - MENU_WIDTH - 8));
+    const top = Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - 320));
+    setMenuPos({ top, left });
+    setSelectedUser(u);
+    setOpenMenu(u.id);
+  };
+
+  // Close the menu when clicking anywhere outside it, or on scroll/resize
+  // (fixed-positioned menu would otherwise detach from its anchor).
+  useEffect(() => {
+    if (!openMenu) return;
+    const onDown = (e: MouseEvent) => {
+      if (menuRef.current && menuRef.current.contains(e.target as Node)) return;
+      setOpenMenu(null);
+    };
+    const onScroll = () => setOpenMenu(null);
+    document.addEventListener('mousedown', onDown);
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onScroll);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [openMenu]);
 
   return (
     <div style={{ padding: '28px' }}>
@@ -173,34 +213,11 @@ const AdminUsersPage: React.FC = () => {
                     {u.last_login ? new Date(u.last_login).toLocaleDateString() : 'Never'}
                   </td>
                   <td style={{ padding: '12px 14px', color: '#e2e8f0', fontWeight: 600 }}>{u.login_count}</td>
-                  <td style={{ padding: '12px 14px', position: 'relative' }}>
-                    <button onClick={(e) => { e.stopPropagation(); setOpenMenu(openMenu === u.id ? null : u.id); setSelectedUser(u); }}
+                  <td style={{ padding: '12px 14px' }}>
+                    <button onClick={(e) => { e.stopPropagation(); toggleMenu(u, e.currentTarget); }}
                       style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: '#94a3b8', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <MoreVertical size={16} />
                     </button>
-                    <AnimatePresence>
-                      {openMenu === u.id && (
-                        <motion.div initial={{ opacity: 0, scale: 0.9, y: -8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }}
-                          style={{ position: 'absolute', right: '50px', top: '8px', background: '#1e2235', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '6px', zIndex: 100, minWidth: '180px', boxShadow: '0 16px 40px rgba(0,0,0,0.6)' }}>
-                          {[
-                            !u.is_verified && { icon: <Mail size={14} />, label: 'Verify Email', action: () => act(() => manuallyVerifyEmail(u.id), 'Email verified.'), color: '#34d399' },
-                            !u.is_suspended ? { icon: <UserX size={14} />, label: 'Suspend', action: () => { setShowSuspendModal(true); setOpenMenu(null); }, color: '#f97316' }
-                              : { icon: <UserCheck size={14} />, label: 'Activate', action: () => act(() => activateUser(u.id), 'User activated.'), color: '#34d399' },
-                            { icon: <Lock size={14} />, label: 'Lock Account', action: () => act(() => lockAccount(u.id), 'Account locked.'), color: '#eab308' },
-                            { icon: <Key size={14} />, label: 'Send Reset Link', action: () => act(() => adminResetPassword(u.id), 'Reset link sent.'), color: '#6366f1' },
-                            !u.is_admin && { icon: <Shield size={14} />, label: 'Make Admin', action: () => act(() => changeUserRole(u.id, 'admin'), 'Role changed to admin.'), color: '#8b5cf6' },
-                            u.is_admin && !u.is_admin && { icon: <Users size={14} />, label: 'Remove Admin', action: () => act(() => changeUserRole(u.id, 'user'), 'Role changed to user.'), color: '#94a3b8' },
-                            { icon: <LogOut size={14} />, label: 'Force Logout', action: () => act(() => forceLogoutUser(u.id), 'User logged out.'), color: '#64748b' },
-                            !u.is_admin && { icon: <Trash2 size={14} />, label: 'Delete User', action: () => act(() => softDeleteUser(u.id), 'User deleted.'), color: '#ef4444' },
-                          ].filter(Boolean).map((item: any, i) => (
-                            <button key={i} onClick={item.action}
-                              style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 10px', background: 'none', border: 'none', borderRadius: '8px', cursor: 'pointer', color: item.color, fontSize: '13px', fontWeight: 600, textAlign: 'left' }}>
-                              {item.icon}{item.label}
-                            </button>
-                          ))}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
                   </td>
                 </tr>
               ))}
@@ -245,10 +262,43 @@ const AdminUsersPage: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Click outside to close menu */}
-      {openMenu && <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setOpenMenu(null)} />}
-
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+
+      {/* ── Actions Dropdown (rendered via portal to document.body) ─────────────
+          Must live OUTSIDE the .glow-card: the card clips its children
+          (`overflow: hidden !important`) and sits at z-index 1, which trapped
+          the menu under every other layer and swallowed all option clicks. */}
+      {createPortal(
+        <AnimatePresence>
+          {openMenu && selectedUser && (
+            <motion.div ref={menuRef}
+              initial={{ opacity: 0, scale: 0.95, y: -6 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.12 }}
+              style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, background: '#1e2235', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '6px', zIndex: 1000, minWidth: `${MENU_WIDTH}px`, boxShadow: '0 16px 40px rgba(0,0,0,0.6)' }}
+              onClick={(e) => e.stopPropagation()}>
+              {[
+                !selectedUser.is_verified && { icon: <Mail size={14} />, label: 'Verify Email', action: () => act(() => manuallyVerifyEmail(selectedUser.id), 'Email verified.'), color: '#34d399' },
+                !selectedUser.is_suspended
+                  ? { icon: <UserX size={14} />, label: 'Suspend', action: () => { setShowSuspendModal(true); setOpenMenu(null); }, color: '#f97316' }
+                  : { icon: <UserCheck size={14} />, label: 'Activate', action: () => act(() => activateUser(selectedUser.id), 'User activated.'), color: '#34d399' },
+                { icon: <Lock size={14} />, label: 'Lock Account', action: () => act(() => lockAccount(selectedUser.id), 'Account locked.'), color: '#eab308' },
+                { icon: <Unlock size={14} />, label: 'Unlock Account', action: () => act(() => unlockAccount(selectedUser.id), 'Account unlocked.'), color: '#eab308' },
+                { icon: <Key size={14} />, label: 'Send Reset Link', action: () => act(() => adminResetPassword(selectedUser.id), 'Reset link sent.'), color: '#6366f1' },
+                !selectedUser.is_admin && { icon: <Shield size={14} />, label: 'Make Admin', action: () => act(() => changeUserRole(selectedUser.id, 'admin'), 'Role changed to admin.'), color: '#8b5cf6' },
+                selectedUser.is_admin && selectedUser.id !== currentUserId && { icon: <Users size={14} />, label: 'Remove Admin', action: () => act(() => changeUserRole(selectedUser.id, 'user'), 'Role changed to user.'), color: '#94a3b8' },
+                { icon: <LogOut size={14} />, label: 'Force Logout', action: () => act(() => forceLogoutUser(selectedUser.id), 'User logged out.'), color: '#64748b' },
+                !selectedUser.is_admin && { icon: <Trash2 size={14} />, label: 'Delete User', action: () => act(() => softDeleteUser(selectedUser.id), 'User deleted.'), color: '#ef4444' },
+              ].filter(Boolean).map((item: any, i) => (
+                <button key={i} onClick={item.action}
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 10px', background: 'none', border: 'none', borderRadius: '8px', cursor: 'pointer', color: item.color, fontSize: '13px', fontWeight: 600, textAlign: 'left' }}>
+                  {item.icon}{item.label}
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 };
