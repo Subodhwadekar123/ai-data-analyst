@@ -40,7 +40,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, and_, or_
+from sqlalchemy import desc, and_, or_, func
 from pydantic import BaseModel, EmailStr
 
 from app.database import (
@@ -478,6 +478,21 @@ async def permanent_delete_user(
     email = user.email
     db.delete(user)
     db.commit()
+
+    # Free the email for fresh registration: any OTHER rows still holding the
+    # same address (legacy soft-deleted duplicates that are invisible in the
+    # admin list) are tombstone-renamed so the UNIQUE constraint on users.email
+    # no longer blocks sign-ups with this address.
+    stale_rows = db.query(UserRecord).filter(
+        func.lower(UserRecord.email) == email.lower(),
+        UserRecord.id != user_id,
+    ).all()
+    for stale in stale_rows:
+        stale.email = f"deleted_{uuid.uuid4().hex[:8]}_{stale.email}"
+        stale.username = None
+    if stale_rows:
+        db.commit()
+        logger.info(f"[ADMIN] Freed {len(stale_rows)} stale row(s) holding email {email}")
 
     ip = get_client_ip(request)
     log_event(db, AuditAction.ADMIN_PERMANENT_DELETE, user_email=email,

@@ -51,6 +51,7 @@ const AdminUsersPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [filterRole, setFilterRole] = useState('');
   const [filterActive, setFilterActive] = useState('');
+  const [filterDeleted, setFilterDeleted] = useState('');
   const [filterVerified, setFilterVerified] = useState('');
   const [filterSuspended, setFilterSuspended] = useState('');
   const [openMenu, setOpenMenu] = useState<string | null>(null);
@@ -70,6 +71,7 @@ const AdminUsersPage: React.FC = () => {
       if (search) params.search = search;
       if (filterRole) params.role = filterRole;
       if (filterActive !== '') params.is_active = filterActive === 'true';
+      if (filterDeleted === 'true') params.is_deleted = true;
       if (filterVerified !== '') params.is_verified = filterVerified === 'true';
       if (filterSuspended !== '') params.is_suspended = filterSuspended === 'true';
       const res = await listUsers(params) as any;
@@ -80,7 +82,7 @@ const AdminUsersPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, search, filterRole, filterActive, filterVerified, filterSuspended]);
+  }, [page, search, filterRole, filterActive, filterDeleted, filterVerified, filterSuspended]);
 
   useEffect(() => { loadUsers(); }, [loadUsers]);
 
@@ -157,6 +159,9 @@ const AdminUsersPage: React.FC = () => {
         <select value={filterActive} onChange={(e) => { setFilterActive(e.target.value); setPage(0); }} style={selectStyle}>
           <option value="">Any Status</option><option value="true">Active</option><option value="false">Inactive</option>
         </select>
+        <select value={filterDeleted} onChange={(e) => { setFilterDeleted(e.target.value); setPage(0); }} style={selectStyle}>
+          <option value="">Active Users</option><option value="true">Deleted Users</option>
+        </select>
         <select value={filterVerified} onChange={(e) => { setFilterVerified(e.target.value); setPage(0); }} style={selectStyle}>
           <option value="">Any Verification</option><option value="true">Verified</option><option value="false">Unverified</option>
         </select>
@@ -201,9 +206,11 @@ const AdminUsersPage: React.FC = () => {
                     </span>
                   </td>
                   <td style={{ padding: '12px 14px' }}>
-                    {u.is_suspended
-                      ? <span style={{ color: '#f97316', fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}><AlertTriangle size={11} /> Suspended</span>
-                      : <StatusBadge ok={u.is_active} trueLabel="Active" falseLabel="Inactive" />}
+                    {u.is_deleted
+                      ? <span style={{ color: '#f87171', fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}><XCircle size={11} /> Deleted</span>
+                      : u.is_suspended
+                        ? <span style={{ color: '#f97316', fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}><AlertTriangle size={11} /> Suspended</span>
+                        : <StatusBadge ok={u.is_active} trueLabel="Active" falseLabel="Inactive" />}
                   </td>
                   <td style={{ padding: '12px 14px' }}>
                     <StatusBadge ok={u.is_verified} trueLabel="Verified" falseLabel="Pending" />
@@ -328,20 +335,25 @@ const AdminUsersPage: React.FC = () => {
               transition={{ duration: 0.12 }}
               style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, background: '#1e2235', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '6px', zIndex: 1000, minWidth: `${MENU_WIDTH}px`, boxShadow: '0 16px 40px rgba(0,0,0,0.6)' }}
               onClick={(e) => e.stopPropagation()}>
-              {[
-                !selectedUser.is_verified && { icon: <Mail size={14} />, label: 'Verify Email', action: () => act(() => manuallyVerifyEmail(selectedUser.id), 'Email verified.'), color: '#34d399' },
-                !selectedUser.is_suspended
-                  ? { icon: <UserX size={14} />, label: 'Suspend', action: () => { setShowSuspendModal(true); setOpenMenu(null); }, color: '#f97316' }
-                  : { icon: <UserCheck size={14} />, label: 'Activate', action: () => act(() => activateUser(selectedUser.id), 'User activated.'), color: '#34d399' },
-                { icon: <Lock size={14} />, label: 'Lock Account', action: () => act(() => lockAccount(selectedUser.id), 'Account locked.'), color: '#eab308' },
-                { icon: <Unlock size={14} />, label: 'Unlock Account', action: () => act(() => unlockAccount(selectedUser.id), 'Account unlocked.'), color: '#eab308' },
-                { icon: <Key size={14} />, label: 'Send Reset Link', action: () => act(() => adminResetPassword(selectedUser.id), 'Reset link sent.'), color: '#6366f1' },
-                !selectedUser.is_admin && { icon: <Shield size={14} />, label: 'Make Admin', action: () => act(() => changeUserRole(selectedUser.id, 'admin'), 'Role changed to admin.'), color: '#8b5cf6' },
-                selectedUser.is_admin && selectedUser.id !== currentUserId && { icon: <Users size={14} />, label: 'Remove Admin', action: () => act(() => changeUserRole(selectedUser.id, 'user'), 'Role changed to user.'), color: '#94a3b8' },
-                { icon: <LogOut size={14} />, label: 'Force Logout', action: () => act(() => forceLogoutUser(selectedUser.id), 'User logged out.'), color: '#64748b' },
-                !selectedUser.is_admin && { icon: <Trash2 size={14} />, label: 'Delete User', action: () => act(() => softDeleteUser(selectedUser.id), 'User deleted.'), color: '#ef4444' },
-                !selectedUser.is_admin && { icon: <AlertTriangle size={14} />, label: 'Permanently Delete', action: () => { setPermanentDeleteConfirm(''); setShowPermanentDeleteModal(true); setOpenMenu(null); }, color: '#dc2626' },
-              ].filter(Boolean).map((item: any, i) => (
+              {(
+                selectedUser.is_deleted ? [
+                  // Soft-deleted users can only be permanently removed
+                  { icon: <AlertTriangle size={14} />, label: 'Permanently Delete', action: () => { setPermanentDeleteConfirm(''); setShowPermanentDeleteModal(true); setOpenMenu(null); }, color: '#dc2626' },
+                ] : [
+                  !selectedUser.is_verified && { icon: <Mail size={14} />, label: 'Verify Email', action: () => act(() => manuallyVerifyEmail(selectedUser.id), 'Email verified.'), color: '#34d399' },
+                  !selectedUser.is_suspended
+                    ? { icon: <UserX size={14} />, label: 'Suspend', action: () => { setShowSuspendModal(true); setOpenMenu(null); }, color: '#f97316' }
+                    : { icon: <UserCheck size={14} />, label: 'Activate', action: () => act(() => activateUser(selectedUser.id), 'User activated.'), color: '#34d399' },
+                  { icon: <Lock size={14} />, label: 'Lock Account', action: () => act(() => lockAccount(selectedUser.id), 'Account locked.'), color: '#eab308' },
+                  { icon: <Unlock size={14} />, label: 'Unlock Account', action: () => act(() => unlockAccount(selectedUser.id), 'Account unlocked.'), color: '#eab308' },
+                  { icon: <Key size={14} />, label: 'Send Reset Link', action: () => act(() => adminResetPassword(selectedUser.id), 'Reset link sent.'), color: '#6366f1' },
+                  !selectedUser.is_admin && { icon: <Shield size={14} />, label: 'Make Admin', action: () => act(() => changeUserRole(selectedUser.id, 'admin'), 'Role changed to admin.'), color: '#8b5cf6' },
+                  selectedUser.is_admin && selectedUser.id !== currentUserId && { icon: <Users size={14} />, label: 'Remove Admin', action: () => act(() => changeUserRole(selectedUser.id, 'user'), 'Role changed to user.'), color: '#94a3b8' },
+                  { icon: <LogOut size={14} />, label: 'Force Logout', action: () => act(() => forceLogoutUser(selectedUser.id), 'User logged out.'), color: '#64748b' },
+                  !selectedUser.is_admin && { icon: <Trash2 size={14} />, label: 'Delete User', action: () => act(() => softDeleteUser(selectedUser.id), 'User deleted.'), color: '#ef4444' },
+                  !selectedUser.is_admin && { icon: <AlertTriangle size={14} />, label: 'Permanently Delete', action: () => { setPermanentDeleteConfirm(''); setShowPermanentDeleteModal(true); setOpenMenu(null); }, color: '#dc2626' },
+                ].filter(Boolean)
+              ).map((item: any, i) => (
                 <button key={i} onClick={item.action}
                   style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 10px', background: 'none', border: 'none', borderRadius: '8px', cursor: 'pointer', color: item.color, fontSize: '13px', fontWeight: 600, textAlign: 'left' }}>
                   {item.icon}{item.label}
