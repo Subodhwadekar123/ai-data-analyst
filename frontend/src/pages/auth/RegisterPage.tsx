@@ -52,7 +52,6 @@ const RegisterPage: React.FC = () => {
   const [otpError, setOtpError] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
   const [emailSendFailed, setEmailSendFailed] = useState(false);
-  const [devCode, setDevCode] = useState('');
   const location = useLocation();
 
   // ── Backend warm-up ping ────────────────────────────────────────────────────
@@ -76,13 +75,10 @@ const RegisterPage: React.FC = () => {
   // in redirects them to /verify-email, which now returns an OTP challenge. Drop
   // them straight into the OTP entry step instead of making them re-type details.
   useEffect(() => {
-    const st = location.state as { challengeId?: string; maskedEmail?: string; devCode?: string } | null;
+    const st = location.state as { challengeId?: string; maskedEmail?: string } | null;
     if (st?.challengeId) {
       setChallengeId(st.challengeId);
       setMaskedEmail(st.maskedEmail || '');
-      const dc = typeof st.devCode === 'string' ? st.devCode : '';
-      setDevCode(dc);
-      setOtpDigits(dc ? dc.slice(0, 6).split('') : ['', '', '', '', '', '']);
       setRegistered(true);
       setTimeout(() => otpInputsRef.current?.[0]?.focus(), 250);
     }
@@ -127,9 +123,6 @@ const RegisterPage: React.FC = () => {
       if (res?.otp_required && res?.challenge_id) {
         setChallengeId(res.challenge_id);
         setMaskedEmail(res.masked_email || formData.email);
-        const dc = typeof res.dev_code === 'string' ? res.dev_code : '';
-        setDevCode(dc);
-        setOtpDigits(dc ? dc.slice(0, 6).split('') : ['', '', '', '', '', '']);
         setEmailSendFailed(res.email_sent === false);
         setRegistered(true);
         setTimeout(() => otpInputsRef.current?.[0]?.focus(), 250);
@@ -250,12 +243,6 @@ const RegisterPage: React.FC = () => {
         setChallengeId(res.challenge_id);
       }
       setEmailSendFailed(res?.email_sent === false);
-      const newDevCode = typeof res?.dev_code === 'string' ? res.dev_code : '';
-      setDevCode(newDevCode);
-      if (newDevCode) {
-        // Dev convenience: prefill the code so local testing never blocks
-        setOtpDigits(newDevCode.slice(0, 6).split(''));
-      }
       toast.success(res?.message || 'A new verification code has been sent to your email.');
       if (res?.email_sent === false) {
         toast.error('Email delivery failed — check backend SMTP settings.');
@@ -299,13 +286,6 @@ const RegisterPage: React.FC = () => {
                 background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.35)', borderRadius: '8px',
                 padding: '8px 12px', marginBottom: '14px', fontSize: '13px', color: '#fb923c' }}>
                 <AlertCircle size={14} /><span>Email delivery failed. Please wait a moment and use "Resend code".</span>
-              </div>
-            )}
-            {devCode && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                background: 'rgba(99,102,241,0.08)', border: '1px dashed rgba(99,102,241,0.45)', borderRadius: '8px',
-                padding: '8px 12px', marginBottom: '14px', fontSize: '13px', color: '#a5b4fc' }}>
-                <span>Dev mode — your code is <strong style={{ fontFamily: 'var(--font-family-mono)', fontSize: '15px', letterSpacing: 2 }}>{devCode}</strong> (not shown in production)</span>
               </div>
             )}
 

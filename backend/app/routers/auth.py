@@ -246,8 +246,6 @@ async def register(request: Request, body: RegisterRequest, db: Session = Depend
                     "expires_at": expires_at.isoformat(),
                     "email_sent": email_sent,
                 }
-                if settings.ENVIRONMENT != "production":
-                    payload["dev_code"] = code
                 return payload
         raise
 
@@ -271,9 +269,6 @@ async def register(request: Request, body: RegisterRequest, db: Session = Depend
             response["message"] = "Account created! We emailed you a 6-digit verification code."
         else:
             response["message"] = "Account created, but the verification email could not be sent. Please use 'Resend code' in a moment."
-        # Non-production convenience: echo the code so local testing never blocks
-        if settings.ENVIRONMENT != "production":
-            response["dev_code"] = code
 
     return response
 
@@ -346,9 +341,6 @@ async def resend_otp(request: Request, body: ResendOtpRequest, db: Session = Dep
         "expires_at": expires_at.isoformat(),
         "email_sent": email_sent,
     }
-    # Non-production convenience: echo the code so local testing never blocks
-    if settings.ENVIRONMENT != "production":
-        result["dev_code"] = code
     return result
 
 
@@ -485,9 +477,6 @@ async def resend_verification(
                 "expires_at": expires_at.isoformat(),
                 "email_sent": email_sent,
             }
-            # Non-production convenience: echo the code so local testing never blocks
-            if settings.ENVIRONMENT != "production":
-                payload["dev_code"] = code
             return payload
 
     verification_url = resend_verification_email(db, body.email, ip)

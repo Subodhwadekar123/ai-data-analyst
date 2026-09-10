@@ -50,7 +50,7 @@ const VerifyEmailPage: React.FC = () => {
       // into the OTP entry step on the register page instead of a dead-end.
       if (res?.otp_required && res?.challenge_id) {
         navigate('/register', {
-          state: { challengeId: res.challenge_id, maskedEmail: res.masked_email, devCode: res.dev_code },
+          state: { challengeId: res.challenge_id, maskedEmail: res.masked_email },
         });
         return;
       }
