@@ -234,12 +234,19 @@ async def register(request: Request, body: RegisterRequest, db: Session = Depend
 
     # OTP email verification flow
     if getattr(settings, "OTP_ENABLED", False) and not user.is_verified:
-        challenge_id, expires_at = send_registration_otp(db, user)
+        challenge_id, code, expires_at, email_sent = await send_registration_otp(db, user)
         response["otp_required"] = True
         response["challenge_id"] = challenge_id
         response["masked_email"] = _mask_email(user.email)
         response["expires_at"] = expires_at.isoformat()
-        response["message"] = "Account created! We emailed you a 6-digit verification code."
+        response["email_sent"] = email_sent
+        if email_sent:
+            response["message"] = "Account created! We emailed you a 6-digit verification code."
+        else:
+            response["message"] = "Account created, but the verification email could not be sent. Please use 'Resend code' in a moment."
+        # Non-production convenience: echo the code so local testing never blocks
+        if settings.ENVIRONMENT != "production":
+            response["dev_code"] = code
 
     return response
 
@@ -296,18 +303,26 @@ async def verify_otp(request: Request, body: VerifyOtpRequest, response: Respons
 async def resend_otp(request: Request, body: ResendOtpRequest, db: Session = Depends(get_db)):
     """
     Resend a new 6-digit OTP code for an existing challenge.
-    Rate-limited by a resend cooldown (default 60s between sends).
+    Rate-limited by a resend cooldown (default 30s between sends).
     """
     try:
-        challenge_id, expires_at = resend_registration_otp(db, body.challenge_id)
+        new_challenge_id, code, expires_at, email_sent = await resend_registration_otp(db, body.challenge_id)
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-    return {
-        "message": "A new verification code has been sent to your email.",
-        "challenge_id": challenge_id,
+    result = {
+        "message": "A new verification code has been sent to your email." if email_sent
+        else "The verification email could not be sent right now. Please try again shortly.",
+        "challenge_id": new_challenge_id,
         "expires_at": expires_at.isoformat(),
+        "email_sent": email_sent,
     }
+    # Non-production convenience: echo the code so local testing never blocks
+    if settings.ENVIRONMENT != "production":
+        result["dev_code"] = code
+    return result
 
 
 @router.post("/login", summary="Login with Email & Password")

@@ -31,7 +31,7 @@ from app.services.audit_service import (
 from app.services.email_service import (
     send_verification_email_bg, send_password_reset_bg,
     send_password_changed_bg, send_new_device_login_bg, send_account_locked_bg,
-    send_otp_email_bg,
+    send_otp_email, send_otp_email_bg,
 )
 from app.services.otp_service import (
     create_otp_challenge, verify_otp_code, get_challenge, check_resend_allowed,
@@ -146,52 +146,58 @@ def _send_verification_email(db: Session, user: UserRecord, ip_address: str = "U
 
 # ── Registration OTP (6-digit email code verification) ────────────────────────
 
-def send_registration_otp(db: Session, user: UserRecord) -> Tuple[str, datetime]:
+async def send_registration_otp(db: Session, user: UserRecord) -> Tuple[str, Optional[str], datetime, bool]:
     """
     Create an OTP challenge for a freshly registered user and email the code.
-    Returns (challenge_id, expires_at).
+
+    The email send is awaited (not fire-and-forget) so the caller knows whether
+    delivery actually succeeded and can tell the user honestly.
+    Returns (challenge_id, plain_code, expires_at, email_sent).
     """
     challenge_id, code, expires_at = create_otp_challenge(db, user.id, purpose="registration")
 
-    send_otp_email_bg(
+    email_sent = await send_otp_email(
         user.email,
         user.full_name or user.email,
         code,
         settings.OTP_EXPIRE_MINUTES,
     )
+    if not email_sent:
+        logger.error(f"[OTP] Failed to email registration code to {user.email} (challenge {challenge_id})")
 
     log_event(db, AuditAction.EMAIL_VERIFICATION_SENT, user_id=user.id, user_email=user.email,
-              description="Registration OTP code sent")
-    return challenge_id, expires_at
+              description="Registration OTP code sent" if email_sent else "Registration OTP email FAILED to send")
+    return challenge_id, code, expires_at, email_sent
 
 
-def resend_registration_otp(db: Session, challenge_id: str) -> Tuple[str, datetime]:
+async def resend_registration_otp(db: Session, challenge_id: str) -> Tuple[str, Optional[str], datetime, bool]:
     """
     Resend the registration OTP for an existing challenge (cooldown-limited).
-    Returns (new_challenge_id, expires_at).
+    Returns (new_challenge_id, plain_code, expires_at, email_sent).
     """
-    # pyrefly: ignore [missing-import]
-    from fastapi import HTTPException
-
     challenge = get_challenge(db, challenge_id)
     try:
         check_resend_allowed(challenge)
     except ValueError as e:
+        # pyrefly: ignore [missing-import]
+        from fastapi import HTTPException
         raise HTTPException(status_code=429, detail=str(e))
 
     user = challenge.user
     new_challenge_id, _code, expires_at = create_otp_challenge(db, user.id, purpose=challenge.purpose)
 
-    send_otp_email_bg(
+    email_sent = await send_otp_email(
         user.email,
         user.full_name or user.email,
         _code,
         settings.OTP_EXPIRE_MINUTES,
     )
+    if not email_sent:
+        logger.error(f"[OTP] Failed to email resent registration code to {user.email} (challenge {new_challenge_id})")
 
     log_event(db, AuditAction.RESEND_VERIFICATION, user_id=user.id, user_email=user.email,
-              description="Registration OTP code resent")
-    return new_challenge_id, expires_at
+              description="Registration OTP code resent" if email_sent else "Registration OTP resend FAILED to send")
+    return new_challenge_id, _code, expires_at, email_sent
 
 
 def verify_registration_otp(

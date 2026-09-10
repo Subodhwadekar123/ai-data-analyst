@@ -69,7 +69,10 @@ async def _send_email(
             start_tls=settings.SMTP_USE_TLS,
         )
 
-        logger.info(f"[EMAIL] Email sent to {to_email}: {subject}")
+        # ASCII-safe so Windows cp1252 consoles don't raise UnicodeEncodeError
+        # on emoji-bearing subjects (logging failure is post-send, but noisy).
+        safe_subject = subject.encode("ascii", errors="replace").decode("ascii")
+        logger.info(f"[EMAIL] Email sent to {to_email}: {safe_subject}")
         return True
 
     except Exception as e:

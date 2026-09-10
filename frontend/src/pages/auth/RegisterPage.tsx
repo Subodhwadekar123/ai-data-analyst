@@ -50,6 +50,8 @@ const RegisterPage: React.FC = () => {
   const [otpLoading, setOtpLoading] = useState(false);
   const [otpError, setOtpError] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [emailSendFailed, setEmailSendFailed] = useState(false);
+  const [devCode, setDevCode] = useState('');
 
   const update = (field: string, value: string | boolean) =>
     setFormData((p) => ({ ...p, [field]: value }));
@@ -90,10 +92,13 @@ const RegisterPage: React.FC = () => {
       if (res?.otp_required && res?.challenge_id) {
         setChallengeId(res.challenge_id);
         setMaskedEmail(res.masked_email || formData.email);
-        setOtpDigits(['', '', '', '', '', '']);
+        const dc = typeof res.dev_code === 'string' ? res.dev_code : '';
+        setDevCode(dc);
+        setOtpDigits(dc ? dc.slice(0, 6).split('') : ['', '', '', '', '', '']);
+        setEmailSendFailed(res.email_sent === false);
         setRegistered(true);
         setTimeout(() => otpInputsRef.current?.[0]?.focus(), 250);
-        startResendCooldown(60);
+        startResendCooldown(30);
       } else {
         setRegistered(true);
       }
@@ -201,10 +206,19 @@ const RegisterPage: React.FC = () => {
       if (res?.challenge_id) {
         setChallengeId(res.challenge_id);
       }
-      toast.success('A new verification code has been sent to your email.');
-      setOtpDigits(['', '', '', '', '', '']);
+      setEmailSendFailed(res?.email_sent === false);
+      const newDevCode = typeof res?.dev_code === 'string' ? res.dev_code : '';
+      setDevCode(newDevCode);
+      if (newDevCode) {
+        // Dev convenience: prefill the code so local testing never blocks
+        setOtpDigits(newDevCode.slice(0, 6).split(''));
+      }
+      toast.success(res?.message || 'A new verification code has been sent to your email.');
+      if (res?.email_sent === false) {
+        toast.error('Email delivery failed — check backend SMTP settings.');
+      }
       setOtpError('');
-      startResendCooldown(60);
+      startResendCooldown(30);
       otpInputsRef.current?.[0]?.focus();
     } catch (err: any) {
       toast.error(err.message || 'Failed to resend the code.');
@@ -233,7 +247,24 @@ const RegisterPage: React.FC = () => {
             <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '6px', fontSize: '14px' }}>
               We emailed a 6-digit code to <strong style={{ color: 'var(--accent-primary)' }}>{maskedEmail}</strong>. Enter it below to activate your account.
             </p>
-            <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginBottom: '22px' }}>Code expires in 10 minutes.</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginBottom: '22px' }}>
+              Code expires in 10 minutes. Can't find it? Check your spam/junk folder.
+            </p>
+
+            {emailSendFailed && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.35)', borderRadius: '8px',
+                padding: '8px 12px', marginBottom: '14px', fontSize: '13px', color: '#fb923c' }}>
+                <AlertCircle size={14} /><span>Email delivery failed. Please wait a moment and use "Resend code".</span>
+              </div>
+            )}
+            {devCode && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                background: 'rgba(99,102,241,0.08)', border: '1px dashed rgba(99,102,241,0.45)', borderRadius: '8px',
+                padding: '8px 12px', marginBottom: '14px', fontSize: '13px', color: '#a5b4fc' }}>
+                <span>Dev mode — your code is <strong style={{ fontFamily: 'var(--font-family-mono)', fontSize: '15px', letterSpacing: 2 }}>{devCode}</strong> (not shown in production)</span>
+              </div>
+            )}
 
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '18px' }}>
               {otpDigits.map((d, i) => (
