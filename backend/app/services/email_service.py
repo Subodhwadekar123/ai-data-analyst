@@ -81,15 +81,20 @@ async def _send_email(
 
 
 def _fire_and_forget(coro):
-    """Schedule an async coroutine without blocking (best-effort email)."""
+    """Schedule an async coroutine to run in the background without blocking.
+
+    Uses call_soon_threadsafe so the task is scheduled on the running loop
+    and will execute even after the current handler returns (important for
+    Render/uvicorn where the loop may be cleaned up quickly).
+    """
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            loop.create_task(coro)
-        else:
-            asyncio.run(coro)
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.get_event_loop()
+        loop.call_soon_threadsafe(lambda: asyncio.ensure_future(coro, loop=loop))
     except Exception as e:
-        logger.error(f"Email fire-and-forget error: {e}")
+        logger.error(f"Email fire-and-forget error: {e}", exc_info=True)
 
 
 # ── Public Email Functions ─────────────────────────────────────────────────────
