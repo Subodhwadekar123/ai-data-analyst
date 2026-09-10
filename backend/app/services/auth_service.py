@@ -214,6 +214,42 @@ async def resend_registration_otp(db: Session, challenge_id: str) -> Tuple[str, 
     return new_challenge_id, _code, expires_at, email_sent
 
 
+async def resend_otp_to_unverified(db: Session, email: str) -> Optional[Tuple[str, str, datetime, bool]]:
+    """
+    Create and email a fresh registration OTP for an EXISTING unverified account.
+
+    Makes registration retry-safe: if a previous register request's response was
+    lost (e.g. backend cold-start timeout) the account exists but the user never
+    saw the OTP page. Re-submitting the same email now resends a code instead of
+    failing with "email already exists".
+
+    Returns (challenge_id, plain_code, expires_at, email_sent) when the email
+    belongs to an unverified, non-deleted account, else None (caller should fall
+    back to the normal "already exists" error or a generic resend message).
+    """
+    user = db.query(UserRecord).filter(
+        UserRecord.email == email.lower().strip(),
+        UserRecord.is_deleted == False,  # noqa: E712
+    ).first()
+    if not user or user.is_verified:
+        return None
+
+    challenge_id, code, expires_at = create_otp_challenge(db, user.id, purpose="registration")
+
+    email_sent = await send_otp_email(
+        user.email,
+        user.full_name or user.email,
+        code,
+        settings.OTP_EXPIRE_MINUTES,
+    )
+    if not email_sent:
+        logger.error(f"[OTP] Failed to email OTP to existing unverified account {user.email} (challenge {challenge_id})")
+
+    log_event(db, AuditAction.RESEND_VERIFICATION, user_id=user.id, user_email=user.email,
+              description="Registration OTP resent to existing unverified account" if email_sent else "Registration OTP resend to unverified account FAILED")
+    return challenge_id, code, expires_at, email_sent
+
+
 def verify_registration_otp(
     db: Session,
     challenge_id: str,

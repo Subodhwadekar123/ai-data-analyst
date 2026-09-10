@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { CheckCircle, XCircle, Loader2, Mail, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -14,6 +14,7 @@ import InteractiveBackground from '../../components/layout/InteractiveBackground
 type State = 'verifying' | 'success' | 'error' | 'expired' | 'no-token';
 
 const VerifyEmailPage: React.FC = () => {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token') || '';
   const [state, setState] = useState<State>(token ? 'verifying' : 'no-token');
@@ -44,7 +45,15 @@ const VerifyEmailPage: React.FC = () => {
     if (!email.trim()) { toast.error('Please enter your email'); return; }
     setResending(true);
     try {
-      await resendVerification(email);
+      const res: any = await resendVerification(email);
+      // OTP flow: the backend returns a challenge id — drop the user straight
+      // into the OTP entry step on the register page instead of a dead-end.
+      if (res?.otp_required && res?.challenge_id) {
+        navigate('/register', {
+          state: { challengeId: res.challenge_id, maskedEmail: res.masked_email, devCode: res.dev_code },
+        });
+        return;
+      }
       setResentOk(true);
       toast.success('Verification email sent!');
     } catch (err: any) {

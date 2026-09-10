@@ -7,8 +7,8 @@
  *  - Post-registration "check your email" screen
  */
 
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import {
@@ -16,6 +16,7 @@ import {
   Loader2, AlertCircle, CheckCircle, ArrowRight, UserPlus, ArrowLeft
 } from 'lucide-react';
 import { registerUser, resendVerification, verifyOtp, resendOtp } from '../../services/authApi';
+import { getApiBaseUrl } from '../../utils/apiUrl';
 import PasswordStrengthMeter from '../../components/auth/PasswordStrengthMeter';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { useStore } from '../../store/useStore';
@@ -52,6 +53,40 @@ const RegisterPage: React.FC = () => {
   const [resendCooldown, setResendCooldown] = useState(0);
   const [emailSendFailed, setEmailSendFailed] = useState(false);
   const [devCode, setDevCode] = useState('');
+  const location = useLocation();
+
+  // ── Backend warm-up ping ────────────────────────────────────────────────────
+  // Free-tier backends (Render, etc.) sleep when idle and a cold start can take
+  // longer than the request timeout. Ping a lightweight health endpoint as soon
+  // as the page loads so the server is awake by the time the user submits.
+  useEffect(() => {
+    const warmUp = async () => {
+      try {
+        await fetch(`${getApiBaseUrl()}/health`, { method: 'GET', mode: 'cors' });
+      } catch {
+        // Ignore — warm-up is best-effort. The login retry logic in
+        // services/authApi.ts handles any remaining cold-start delay.
+      }
+    };
+    warmUp();
+  }, []);
+
+  // ── Hand-off from the verify-email page ──────────────────────────────────────
+  // If the user registered before but the response was lost (cold start), logging
+  // in redirects them to /verify-email, which now returns an OTP challenge. Drop
+  // them straight into the OTP entry step instead of making them re-type details.
+  useEffect(() => {
+    const st = location.state as { challengeId?: string; maskedEmail?: string; devCode?: string } | null;
+    if (st?.challengeId) {
+      setChallengeId(st.challengeId);
+      setMaskedEmail(st.maskedEmail || '');
+      const dc = typeof st.devCode === 'string' ? st.devCode : '';
+      setDevCode(dc);
+      setOtpDigits(dc ? dc.slice(0, 6).split('') : ['', '', '', '', '', '']);
+      setRegistered(true);
+      setTimeout(() => otpInputsRef.current?.[0]?.focus(), 250);
+    }
+  }, [location.state]);
 
   const update = (field: string, value: string | boolean) =>
     setFormData((p) => ({ ...p, [field]: value }));
@@ -103,7 +138,15 @@ const RegisterPage: React.FC = () => {
         setRegistered(true);
       }
     } catch (err: any) {
-      setError(err.message || 'Registration failed. Please try again.');
+      const msg = err.message || 'Registration failed. Please try again.';
+      // If the backend was unreachable / timed out, the request may simply have
+      // hit a cold-starting server. Encourage a retry — the backend now resends
+      // the OTP if the account was actually created.
+      if (msg.toLowerCase().includes('unable to connect') || msg.toLowerCase().includes('starting up') || msg.toLowerCase().includes('took too long')) {
+        setError(msg + ' If you already registered, just press "Create Account" again — we will resend your code.');
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }

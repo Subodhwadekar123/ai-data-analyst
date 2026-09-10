@@ -34,6 +34,7 @@ from app.services.auth_service import (
     forgot_password, reset_password, change_password,
     get_active_sessions, revoke_session,
     send_registration_otp, resend_registration_otp, verify_registration_otp,
+    resend_otp_to_unverified,
 )
 from app.config import settings
 from app.utils.device_parser import get_client_ip
@@ -215,14 +216,40 @@ async def register(request: Request, body: RegisterRequest, db: Session = Depend
     POST /auth/verify-otp (which also auto-logs the user in).
     """
     ip = get_client_ip(request)
-    user, verification_url = register_user(
-        db=db,
-        email=body.email,
-        password=body.password,
-        full_name=body.full_name,
-        username=body.username,
-        ip_address=ip,
-    )
+    try:
+        user, verification_url = register_user(
+            db=db,
+            email=body.email,
+            password=body.password,
+            full_name=body.full_name,
+            username=body.username,
+            ip_address=ip,
+        )
+    except HTTPException as exc:
+        # Retry-safe registration: if the email already belongs to an UNVERIFIED
+        # account (e.g. a prior request's response was lost to a cold-start
+        # timeout), resend a fresh OTP instead of failing with "email exists".
+        if (exc.status_code == status.HTTP_400_BAD_REQUEST
+                and "already exists" in str(exc.detail)
+                and getattr(settings, "OTP_ENABLED", False)):
+            resent = await resend_otp_to_unverified(db, body.email)
+            if resent:
+                challenge_id, code, expires_at, email_sent = resent
+                payload = {
+                    "message": "You already have an unverified account — we emailed you a fresh verification code.",
+                    "user_id": None,
+                    "email": body.email.lower().strip(),
+                    "is_verified": False,
+                    "otp_required": True,
+                    "challenge_id": challenge_id,
+                    "masked_email": _mask_email(body.email),
+                    "expires_at": expires_at.isoformat(),
+                    "email_sent": email_sent,
+                }
+                if settings.ENVIRONMENT != "production":
+                    payload["dev_code"] = code
+                return payload
+        raise
 
     response: dict = {
         "message": "Account created successfully." if user.is_verified else "Account created successfully. Please verify your email.",
@@ -441,8 +468,28 @@ async def resend_verification(
     body: ResendVerificationRequest,
     db: Session = Depends(get_db),
 ):
-    """Resend the email verification link."""
+    """Resend the email verification (OTP code when OTP is enabled, else link)."""
     ip = get_client_ip(request)
+
+    # OTP flow: if the email belongs to an existing unverified account, send a
+    # fresh 6-digit code instead of a magic link.
+    if getattr(settings, "OTP_ENABLED", False):
+        resent = await resend_otp_to_unverified(db, body.email)
+        if resent:
+            challenge_id, code, expires_at, email_sent = resent
+            payload = {
+                "message": "If this email exists and is unverified, a new verification code has been sent.",
+                "otp_required": True,
+                "challenge_id": challenge_id,
+                "masked_email": _mask_email(body.email),
+                "expires_at": expires_at.isoformat(),
+                "email_sent": email_sent,
+            }
+            # Non-production convenience: echo the code so local testing never blocks
+            if settings.ENVIRONMENT != "production":
+                payload["dev_code"] = code
+            return payload
+
     verification_url = resend_verification_email(db, body.email, ip)
     return {
         "message": "If this email exists and is unverified, a new verification link has been sent.",
