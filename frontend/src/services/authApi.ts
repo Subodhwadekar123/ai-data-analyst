@@ -98,32 +98,30 @@ authApi.interceptors.response.use(
       }
     }
 
-    // ── Cold-start retry for sleeping/slow backends ─────────────────────────
-    // Free-tier backends (Render, etc.) sleep when idle. The first request
-    // fails with a network error while the server boots. Retry a few times
-    // with a delay instead of failing instantly.
+    // ── Cold-start handling for sleeping/slow backends ─────────────────────────
+    // Free-tier backends (Render, etc.) sleep when idle and a cold start can
+    // take 30-60s — far longer than any sane request timeout. Rather than firing
+    // requests that are guaranteed to fail, the verify flow calls waitForServer()
+    // (below) to poll /health until the backend is awake. We still do a single
+    // modest retry here as a backstop for transient mid-request failures.
     const isNetworkError =
       error.message === 'Network Error' || error.code === 'ERR_NETWORK' || !error.response;
     const isTimeout = error.code === 'ECONNABORTED';
 
-    if ((isNetworkError || isTimeout) && originalRequest) {
-      const retries = (originalRequest._coldRetryCount as number) || 0;
-      if (retries < 3) {
-        originalRequest._coldRetryCount = retries + 1;
-        await new Promise((r) => setTimeout(r, 3000));
-        try {
-          return await authApi(originalRequest);
-        } catch (retryError: any) {
-          error = retryError;
-          // fall through to final message below
-        }
+    if ((isNetworkError || isTimeout) && originalRequest && !originalRequest._coldRetried) {
+      originalRequest._coldRetried = true;
+      await new Promise((r) => setTimeout(r, 2000));
+      try {
+        return await authApi(originalRequest);
+      } catch (retryError: any) {
+        error = retryError;
       }
     }
 
     let message = error.response?.data?.detail;
     if (!message) {
       if (error.message === 'Network Error' || error.code === 'ERR_NETWORK' || !error.response) {
-        message = 'Unable to connect to the backend server. If this is the first request in a while, the backend may be starting up — please try again in a few seconds.';
+        message = 'Unable to connect to the backend server. The backend may be starting up — please wait and try again.';
       } else if (error.code === 'ECONNABORTED') {
         message = 'The backend took too long to respond (it may be starting up). Please try again.';
       } else {
@@ -133,6 +131,25 @@ authApi.interceptors.response.use(
     return Promise.reject(new Error(message));
   }
 );
+
+// ── Wait for a sleeping backend to wake ──────────────────────────────────────
+// Free-tier backends (Render, etc.) sleep when idle. Poll the lightweight /health
+// endpoint until it responds, so the user sees clear "starting up" feedback
+// instead of a generic network error. Returns true if the server responded
+// within the deadline, false otherwise.
+export async function waitForServer(timeoutMs = 90000, intervalMs = 2000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`${API_BASE}/health`, { method: 'GET', mode: 'cors' });
+      if (res.ok) return true;
+    } catch {
+      // not up yet — keep polling
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  return false;
+}
 
 // ── Auth API Functions ────────────────────────────────────────────────────────
 

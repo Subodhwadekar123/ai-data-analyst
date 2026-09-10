@@ -15,7 +15,7 @@ import {
   User, Mail, Lock, Eye, EyeOff, Shield,
   Loader2, AlertCircle, CheckCircle, ArrowRight, UserPlus, ArrowLeft
 } from 'lucide-react';
-import { registerUser, resendVerification, verifyOtp, resendOtp } from '../../services/authApi';
+import { registerUser, resendVerification, verifyOtp, resendOtp, waitForServer } from '../../services/authApi';
 import { getApiBaseUrl } from '../../utils/apiUrl';
 import PasswordStrengthMeter from '../../components/auth/PasswordStrengthMeter';
 import { useIsMobile } from '../../hooks/useMediaQuery';
@@ -52,6 +52,7 @@ const RegisterPage: React.FC = () => {
   const [otpError, setOtpError] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
   const [emailSendFailed, setEmailSendFailed] = useState(false);
+  const [serverStarting, setServerStarting] = useState(false);
   const location = useLocation();
 
   // ── Backend warm-up ping ────────────────────────────────────────────────────
@@ -212,6 +213,16 @@ const RegisterPage: React.FC = () => {
     setOtpLoading(true);
     setOtpError('');
     try {
+      // Free-tier backends sleep when idle — poll /health until awake so the
+      // verify request doesn't time out during a cold start.
+      setServerStarting(true);
+      const ready = await waitForServer();
+      setServerStarting(false);
+      if (!ready) {
+        setOtpError('The backend server did not start in time. Please try again in a moment.');
+        setOtpLoading(false);
+        return;
+      }
       const res = await verifyOtp(challengeId, code);
       // Auto-login: store tokens + user, then go to dashboard
       if (res?.access_token) {
@@ -310,6 +321,15 @@ const RegisterPage: React.FC = () => {
                   padding: '8px 12px', marginBottom: '16px', fontSize: '13px', color: '#f87171' }}>
                 <AlertCircle size={14} /><span>{otpError}</span>
               </motion.div>
+            )}
+
+            {serverStarting && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.3)', borderRadius: '8px',
+                padding: '8px 12px', marginBottom: '16px', fontSize: '13px', color: '#fb923c' }}>
+                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                <span>Starting up the server — this can take up to a minute on first use…</span>
+              </div>
             )}
 
             <motion.button whileHover={{ scale: otpLoading ? 1 : 1.01 }} whileTap={{ scale: otpLoading ? 1 : 0.98 }}
