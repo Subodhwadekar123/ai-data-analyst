@@ -98,7 +98,12 @@ authApi.interceptors.response.use(
       }
     }
 
-    let message = error.response?.data?.detail;
+    // Structured detail (e.g. unverified-login 403 returns an object with
+    // otp_required / challenge_id / masked_email) — surface the message and
+    // propagate the fields so pages can react (e.g. land on the OTP page).
+    const detail = error.response?.data?.detail;
+    let message = typeof detail === 'string' ? detail : (detail?.message as string | undefined);
+
     if (!message) {
       if (error.message === 'Network Error' || error.code === 'ERR_NETWORK' || !error.response) {
         message = 'Unable to connect to the backend server. Please verify your backend server is running and accessible.';
@@ -108,7 +113,14 @@ authApi.interceptors.response.use(
         message = error.message || 'An error occurred';
       }
     }
-    return Promise.reject(new Error(message));
+
+    const wrapped = new Error(message) as Error & { otp_required?: boolean; challenge_id?: string; masked_email?: string };
+    if (detail && typeof detail === 'object') {
+      wrapped.otp_required = !!detail.otp_required;
+      wrapped.challenge_id = detail.challenge_id;
+      wrapped.masked_email = detail.masked_email;
+    }
+    return Promise.reject(wrapped);
   }
 );
 

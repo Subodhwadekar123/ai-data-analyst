@@ -26,7 +26,7 @@ import InteractiveBackground from '../../components/layout/InteractiveBackground
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const { setUser, setToken, setSessionId } = useStore();
+  const { setUser, setToken, setSessionId, logout } = useStore();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -91,13 +91,23 @@ const LoginPage: React.FC = () => {
     } catch (err: any) {
       const msg = err.message || 'Login failed. Please verify your credentials.';
       setError(msg);
+
+      // Unverified account: backend emailed a fresh OTP — log out any stale
+      // session and land directly on the OTP verification page with the
+      // challenge pre-loaded.
+      if (err.otp_required && err.challenge_id) {
+        logout();
+        toast.success('Verification code sent! Check your email.', { duration: 4000 });
+        navigate(`/verify-email?challenge=${encodeURIComponent(err.challenge_id)}&email=${encodeURIComponent(err.masked_email || email)}`);
+        return;
+      }
       if (msg.toLowerCase().includes('verify your email')) {
         setTimeout(() => navigate('/verify-email'), 2000);
       }
     } finally {
       setLoading(false);
     }
-  }, [email, password, rememberMe, setUser, setToken, setSessionId, navigate]);
+  }, [email, password, rememberMe, setUser, setToken, setSessionId, logout, navigate]);
 
   return (
     <div style={{

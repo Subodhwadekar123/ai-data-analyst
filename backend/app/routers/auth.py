@@ -36,6 +36,7 @@ from app.services.auth_service import (
     send_registration_otp, resend_registration_otp, verify_registration_otp,
     resend_otp_to_unverified,
 )
+from app.services.otp_service import create_otp_challenge
 from app.services.email_service import send_otp_email
 from app.config import settings
 from app.utils.device_parser import get_client_ip
@@ -355,24 +356,57 @@ async def resend_otp(request: Request, background: BackgroundTasks, body: Resend
 @router.post("/login", summary="Login with Email & Password")
 async def login(
     request: Request,
+    background: BackgroundTasks,
     body: LoginRequest,
     response: Response,
     db: Session = Depends(get_db),
 ):
     """
     Authenticate user and issue JWT access token + HttpOnly refresh token cookie.
+
+    If the account is unverified (OTP flow), a fresh OTP code is emailed via
+    BackgroundTasks and a structured 403 is returned so the frontend can land
+    the user directly on the OTP verification page.
     """
     ip = get_client_ip(request)
     ua = request.headers.get("User-Agent", "")
 
-    access_token, refresh_token, session_id, user = login_user(
-        db=db,
-        email=body.email,
-        password=body.password,
-        user_agent=ua,
-        ip_address=ip,
-        remember_me=body.remember_me,
-    )
+    try:
+        access_token, refresh_token, session_id, user = login_user(
+            db=db,
+            email=body.email,
+            password=body.password,
+            user_agent=ua,
+            ip_address=ip,
+            remember_me=body.remember_me,
+        )
+    except HTTPException as exc:
+        # Unverified account (OTP flow): issue a fresh code and hand the
+        # frontend everything it needs to land on the OTP verification page.
+        if (exc.status_code == status.HTTP_403_FORBIDDEN
+                and "verify your email" in str(exc.detail)
+                and getattr(settings, "OTP_ENABLED", False)):
+            unverified = db.query(UserRecord).filter(
+                UserRecord.email == body.email.lower().strip(),
+                UserRecord.is_deleted == False,  # noqa: E712
+            ).first()
+            if unverified:
+                challenge_id, code, expires_at = create_otp_challenge(
+                    db, unverified.id, purpose="registration")
+                # Guaranteed delivery: BackgroundTasks outlives the response.
+                background.add_task(
+                    send_otp_email, unverified.email,
+                    unverified.full_name or unverified.email,
+                    code, settings.OTP_EXPIRE_MINUTES)
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "message": "Please verify your email before logging in. We emailed you a fresh verification code.",
+                        "otp_required": True,
+                        "challenge_id": challenge_id,
+                        "masked_email": _mask_email(unverified.email),
+                    })
+        raise
 
     _set_refresh_cookie(response, refresh_token, body.remember_me)
 
