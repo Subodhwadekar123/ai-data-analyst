@@ -56,7 +56,7 @@ export interface UserListParams {
   search?: string;
   role?: string;
   is_active?: boolean;
-  is_verified?: boolean;
+  is_approved?: boolean;
   is_suspended?: boolean;
   is_deleted?: boolean;
   limit?: number;
@@ -93,8 +93,8 @@ export const permanentDeleteUser = (userId: string): Promise<any> =>
 export const changeUserRole = (userId: string, role: 'user' | 'admin'): Promise<any> =>
   adminApi.put(`/users/${userId}/role`, { role }) as Promise<any>;
 
-export const manuallyVerifyEmail = (userId: string): Promise<any> =>
-  adminApi.put(`/users/${userId}/verify-email`) as Promise<any>;
+export const approveUser = (userId: string): Promise<any> =>
+  adminApi.put(`/users/${userId}/approve`) as Promise<any>;
 
 export const forceLogoutUser = (userId: string): Promise<any> =>
   adminApi.put(`/users/${userId}/force-logout`) as Promise<any>;
@@ -125,7 +125,6 @@ export const getLoginActivity = (params: ActivityParams = {}): Promise<any> =>
   adminApi.get('/login-activity', { params }) as Promise<any>;
 
 export const getLoginActivityCsvUrl = (params: { date_from?: string; date_to?: string } = {}): string => {
-  const token = useStore.getState().token;
   const query = new URLSearchParams({ ...(params as any) }).toString();
   return `${API_BASE}/admin/export/login-activity${query ? '?' + query : ''}`;
 };
@@ -166,3 +165,12 @@ export const deleteIssue = (issueId: number): Promise<any> =>
   adminApi.delete(`/issues/${issueId}`) as Promise<any>;
 
 export default adminApi;
+
+export interface PendingUser {
+  id: string;
+  email: string;
+  full_name?: string;
+  created_at: string;
+}
+export const getPendingApprovals = (limit = 20, offset = 0): Promise<{ total: number; users: PendingUser[] }> =>
+  adminApi.get('/pending-approvals', { params: { limit, offset } }) as Promise<{ total: number; users: PendingUser[] }>;

@@ -3,6 +3,9 @@
  * Full CRUD user management with search, filters, inline actions, and modals.
  */
 
+import PendingApprovals from '../../components/admin/PendingApprovals';
+import { APPROVALS_CHANGED } from '../../hooks/usePendingApprovalCount';
+
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -16,13 +19,13 @@ import {
 import { useStore } from '../../store/useStore';
 import {
   listUsers, suspendUser, activateUser, lockAccount, unlockAccount,
-  softDeleteUser, permanentDeleteUser, changeUserRole, manuallyVerifyEmail,
+  softDeleteUser, permanentDeleteUser, changeUserRole, approveUser,
   forceLogoutUser, adminResetPassword
 } from '../../services/adminApi';
 
 interface AdminUser {
   id: string; email: string; username?: string; full_name?: string;
-  role: string; is_admin: boolean; is_active: boolean; is_verified: boolean;
+  role: string; is_admin: boolean; is_active: boolean; is_approved: boolean;
   is_suspended: boolean; is_deleted: boolean; is_online: boolean;
   created_at: string; last_login?: string; login_count: number;
   failed_login_attempts: number; account_age_days: number; suspension_reason?: string;
@@ -52,7 +55,7 @@ const AdminUsersPage: React.FC = () => {
   const [filterRole, setFilterRole] = useState('');
   const [filterActive, setFilterActive] = useState('');
   const [filterDeleted, setFilterDeleted] = useState('');
-  const [filterVerified, setFilterVerified] = useState('');
+  const [filterApproved, setFilterApproved] = useState('');
   const [filterSuspended, setFilterSuspended] = useState('');
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
@@ -72,7 +75,7 @@ const AdminUsersPage: React.FC = () => {
       if (filterRole) params.role = filterRole;
       if (filterActive !== '') params.is_active = filterActive === 'true';
       if (filterDeleted === 'true') params.is_deleted = true;
-      if (filterVerified !== '') params.is_verified = filterVerified === 'true';
+      if (filterApproved !== '') params.is_approved = filterApproved === 'true';
       if (filterSuspended !== '') params.is_suspended = filterSuspended === 'true';
       const res = await listUsers(params) as any;
       setUsers(res.users || []);
@@ -82,7 +85,7 @@ const AdminUsersPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, search, filterRole, filterActive, filterDeleted, filterVerified, filterSuspended]);
+  }, [page, search, filterRole, filterActive, filterDeleted, filterApproved, filterSuspended]);
 
   useEffect(() => { loadUsers(); }, [loadUsers]);
 
@@ -90,6 +93,7 @@ const AdminUsersPage: React.FC = () => {
     setActionLoading('...');
     try {
       await fn();
+      window.dispatchEvent(new Event(APPROVALS_CHANGED));
       toast.success(successMsg);
       setOpenMenu(null);
       loadUsers();
@@ -142,6 +146,7 @@ const AdminUsersPage: React.FC = () => {
           <Users size={22} style={{ display: 'inline', marginRight: '10px', color: '#6366f1', verticalAlign: 'middle' }} />
           User Management
         </h1>
+        <PendingApprovals onApproved={loadUsers} />
         <p style={{ color: '#64748b', margin: 0, fontSize: '14px' }}>{total} total users</p>
       </div>
 
@@ -162,8 +167,8 @@ const AdminUsersPage: React.FC = () => {
         <select value={filterDeleted} onChange={(e) => { setFilterDeleted(e.target.value); setPage(0); }} style={selectStyle}>
           <option value="">Active Users</option><option value="true">Deleted Users</option>
         </select>
-        <select value={filterVerified} onChange={(e) => { setFilterVerified(e.target.value); setPage(0); }} style={selectStyle}>
-          <option value="">Any Verification</option><option value="true">Verified</option><option value="false">Unverified</option>
+        <select value={filterApproved} onChange={(e) => { setFilterApproved(e.target.value); setPage(0); }} style={selectStyle}>
+          <option value="">Any Approval</option><option value="true">Approved</option><option value="false">Pending Approval</option>
         </select>
         <select value={filterSuspended} onChange={(e) => { setFilterSuspended(e.target.value); setPage(0); }} style={selectStyle}>
           <option value="">Any Suspension</option><option value="true">Suspended</option><option value="false">Not Suspended</option>
@@ -177,7 +182,7 @@ const AdminUsersPage: React.FC = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-                {['User', 'Role', 'Status', 'Verified', 'Online', 'Last Login', 'Logins', 'Actions'].map(h => (
+                {['User', 'Role', 'Status', 'Approved', 'Online', 'Last Login', 'Logins', 'Actions'].map(h => (
                   <th key={h} style={{ padding: '12px 14px', textAlign: 'left', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
                 ))}
               </tr>
@@ -213,7 +218,7 @@ const AdminUsersPage: React.FC = () => {
                         : <StatusBadge ok={u.is_active} trueLabel="Active" falseLabel="Inactive" />}
                   </td>
                   <td style={{ padding: '12px 14px' }}>
-                    <StatusBadge ok={u.is_verified} trueLabel="Verified" falseLabel="Pending" />
+                    <StatusBadge ok={u.is_approved} trueLabel="Approved" falseLabel="Pending" />
                   </td>
                   <td style={{ padding: '12px 14px' }}>
                     <span style={{ width: '8px', height: '8px', background: u.is_online ? '#22c55e' : '#475569', borderRadius: '50%', display: 'inline-block', boxShadow: u.is_online ? '0 0 6px #22c55e' : 'none' }} />
@@ -340,7 +345,7 @@ const AdminUsersPage: React.FC = () => {
                   // Soft-deleted users can only be permanently removed
                   { icon: <AlertTriangle size={14} />, label: 'Permanently Delete', action: () => { setPermanentDeleteConfirm(''); setShowPermanentDeleteModal(true); setOpenMenu(null); }, color: '#dc2626' },
                 ] : [
-                  !selectedUser.is_verified && { icon: <Mail size={14} />, label: 'Verify Email', action: () => act(() => manuallyVerifyEmail(selectedUser.id), 'Email verified.'), color: '#34d399' },
+                  !selectedUser.is_approved && { icon: <Mail size={14} />, label: 'Approve Account', action: () => act(() => approveUser(selectedUser.id), 'Account approved.'), color: '#34d399' },
                   !selectedUser.is_suspended
                     ? { icon: <UserX size={14} />, label: 'Suspend', action: () => { setShowSuspendModal(true); setOpenMenu(null); }, color: '#f97316' }
                     : { icon: <UserCheck size={14} />, label: 'Activate', action: () => act(() => activateUser(selectedUser.id), 'User activated.'), color: '#34d399' },

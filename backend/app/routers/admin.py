@@ -16,7 +16,7 @@ User Management:
   DELETE /admin/users/{id}              - Soft delete user
   DELETE /admin/users/{id}/permanent    - Permanent delete (superadmin)
   PUT    /admin/users/{id}/role         - Change user role
-  PUT    /admin/users/{id}/verify-email - Manually verify email
+  PUT    /admin/users/{id}/approve - Approve user
   PUT    /admin/users/{id}/force-logout - Force logout user
   POST   /admin/users/{id}/reset-password - Send reset link
   GET    /admin/users/{id}/sessions     - User active sessions
@@ -63,8 +63,8 @@ router = APIRouter(prefix="/admin", tags=["Administration"])
 class AdminStatsOut(BaseModel):
     total_users: int
     active_users: int
-    verified_users: int
-    unverified_users: int
+    approved_users: int
+    pending_users: int
     suspended_users: int
     deleted_users: int
     total_datasets: int
@@ -82,7 +82,7 @@ class AdminUserOut(BaseModel):
     role: str
     is_admin: bool
     is_active: bool
-    is_verified: bool
+    is_approved: bool
     is_suspended: bool
     is_deleted: bool
     is_online: bool
@@ -186,7 +186,7 @@ def _user_to_dict(u: UserRecord, db: Session) -> dict:
         "role": u.role or "user",
         "is_admin": u.is_admin,
         "is_active": u.is_active,
-        "is_verified": u.is_verified or False,
+        "is_approved": u.is_approved or False,
         "is_suspended": u.is_suspended or False,
         "is_deleted": u.is_deleted or False,
         "is_online": active_session is not None,
@@ -212,8 +212,8 @@ async def get_stats(
     return {
         "total_users": db.query(UserRecord).filter(UserRecord.is_deleted == False).count(),
         "active_users": db.query(UserRecord).filter(UserRecord.is_active == True, UserRecord.is_deleted == False).count(),
-        "verified_users": db.query(UserRecord).filter(UserRecord.is_verified == True, UserRecord.is_deleted == False).count(),
-        "unverified_users": db.query(UserRecord).filter(UserRecord.is_verified == False, UserRecord.is_deleted == False).count(),
+        "approved_users": db.query(UserRecord).filter(UserRecord.is_approved == True, UserRecord.is_deleted == False).count(),
+        "pending_users": db.query(UserRecord).filter(UserRecord.is_approved == False, UserRecord.is_deleted == False).count(),
         "suspended_users": db.query(UserRecord).filter(UserRecord.is_suspended == True).count(),
         "deleted_users": db.query(UserRecord).filter(UserRecord.is_deleted == True).count(),
         "total_datasets": db.query(DatasetRecord).count(),
@@ -236,7 +236,7 @@ async def list_users(
     search: Optional[str] = Query(None, description="Search by name/email/username"),
     role: Optional[str] = Query(None),
     is_active: Optional[bool] = Query(None),
-    is_verified: Optional[bool] = Query(None),
+    is_approved: Optional[bool] = Query(None),
     is_suspended: Optional[bool] = Query(None),
     is_deleted: Optional[bool] = Query(None, description="Include deleted users"),
     limit: int = Query(50, le=200),
@@ -261,8 +261,8 @@ async def list_users(
         query = query.filter(UserRecord.role == role)
     if is_active is not None:
         query = query.filter(UserRecord.is_active == is_active)
-    if is_verified is not None:
-        query = query.filter(UserRecord.is_verified == is_verified)
+    if is_approved is not None:
+        query = query.filter(UserRecord.is_approved == is_approved)
     if is_suspended is not None:
         query = query.filter(UserRecord.is_suspended == is_suspended)
 
@@ -275,6 +275,19 @@ async def list_users(
         "limit": limit,
         "offset": offset,
     }
+
+
+@router.get("/pending-approvals", summary="Pending Account Approvals")
+async def pending_approvals(db: Session = Depends(get_db),
+                            admin: UserRecord = Depends(get_current_admin),
+                            limit: int = Query(20, ge=1, le=200),
+                            offset: int = Query(0, ge=0)):
+    query = db.query(UserRecord).filter(UserRecord.is_approved == False,
+                                       UserRecord.is_deleted == False)
+    total = query.count()
+    users = query.order_by(UserRecord.created_at, UserRecord.id).offset(offset).limit(limit).all()
+    return {"total": total, "users": [{"id": u.id, "email": u.email,
+             "full_name": u.full_name, "created_at": u.created_at} for u in users]}
 
 
 @router.get("/users/{user_id}", summary="Get User Detail")
@@ -532,25 +545,29 @@ async def change_role(
     return {"message": f"Role updated to '{body.role}' for {user.email}."}
 
 
-@router.put("/users/{user_id}/verify-email", summary="Manually Verify Email")
-async def manually_verify_email(
+@router.put("/users/{user_id}/approve", summary="Approve User")
+async def approve_user(
     user_id: str,
     request: Request,
     db: Session = Depends(get_db),
     admin: UserRecord = Depends(get_current_admin),
 ):
-    """Manually mark user's email as verified."""
+    """Approve a pending account without changing activation or suspension."""
     user = db.query(UserRecord).filter(UserRecord.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
 
-    user.is_verified = True
+    if user.is_deleted:
+        raise HTTPException(status_code=409, detail="Deleted accounts cannot be approved.")
+    if user.is_approved:
+        return {"message": "Account is already approved."}
+    user.is_approved = True
     db.commit()
 
     ip = get_client_ip(request)
-    log_admin_action(db, AuditAction.ADMIN_VERIFY_EMAIL, admin.id, admin.email,
-                     user.id, user.email, "Email manually verified by admin", ip)
-    return {"message": f"Email for {user.email} manually verified."}
+    log_admin_action(db, AuditAction.ADMIN_APPROVE_USER, admin.id, admin.email,
+                     user.id, user.email, "Account approved by admin", ip)
+    return {"message": f"Account for {user.email} approved."}
 
 
 @router.put("/users/{user_id}/force-logout", summary="Force Logout User")
@@ -927,31 +944,3 @@ async def delete_issue(
     return {"message": "Issue deleted."}
 
 
-# ── TEMPORARY: Mark all users as unverified (remove after use) ──────────────
-
-@router.post("/debug/mark-all-unverified", summary="[TEMP] Mark all users unverified")
-async def mark_all_unverified(
-    db: Session = Depends(get_db),
-    admin: UserRecord = Depends(get_current_admin),
-):
-    """TEMPORARY: Marks every user as unverified so OTP flow can be tested.
-    Remove this endpoint after use."""
-    count = db.query(UserRecord).filter(UserRecord.is_verified == True).update({"is_verified": False})
-    db.commit()
-    return {"message": f"Marked {count} users as unverified."}
-
-
-@router.delete("/debug/delete-all-users-except-admin", summary="[TEMP] Delete all non-admin users")
-async def delete_all_except_admin(
-    db: Session = Depends(get_db),
-    admin: UserRecord = Depends(get_current_admin),
-):
-    """TEMPORARY: Deletes all users except admin@infinitics.ai."""
-    # Delete related data first
-    db.query(OTPChallenge).delete(synchronize_session=False)
-    db.query(LoginHistory).filter(LoginHistory.user_id != admin.id).delete(synchronize_session=False)
-    db.query(RefreshTokenRecord).filter(RefreshTokenRecord.user_id != admin.id).delete(synchronize_session=False)
-    db.query(SessionRecord).filter(SessionRecord.user_id != admin.id).delete(synchronize_session=False)
-    deleted = db.query(UserRecord).filter(UserRecord.id != admin.id).delete(synchronize_session=False)
-    db.commit()
-    return {"message": f"Deleted {deleted} users. Only admin@infinitics.ai remains."}

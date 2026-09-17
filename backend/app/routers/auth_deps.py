@@ -58,6 +58,10 @@ async def get_current_user(
     if not user:
         raise credentials_exception
 
+    # Approval is independent of activation/suspension and checked on every request.
+    if not user.is_approved:
+        raise HTTPException(status_code=403, detail="Your account is awaiting admin approval.")
+
     if not user.is_active or user.is_suspended:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

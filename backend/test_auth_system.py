@@ -28,8 +28,7 @@ from app.database import (
     UserRecord,
     SessionRecord,
     AuditLog,
-    PasswordResetToken,
-    EmailVerificationToken
+    PasswordResetToken
 )
 from app.services.security import hash_password, verify_password, create_access_token, verify_access_token
 
@@ -78,22 +77,16 @@ def run_tests():
     user_id = data["user_id"]
     print("PASS: User registered successfully.")
 
-    # 3. Test Email Verification Token
-    print("\n[TEST 3] Testing Email Verification Flow...")
+    # 3. Pending accounts cannot log in until approved.
+    pending = client.post("/api/v1/auth/login", json={
+        "email": test_email, "password": "StrongPassword999!"
+    })
+    assert pending.status_code == 403
     with db_session() as db:
-        token_rec = db.query(EmailVerificationToken).filter(
-            EmailVerificationToken.user_id == user_id,
-            EmailVerificationToken.is_used == False
-        ).first()
-        assert token_rec is not None, "Email verification token was not created in DB"
-        raw_token = token_rec.token
-
-    # Verify email with token
-    verify_resp = client.get(f"/api/v1/auth/verify-email?token={raw_token}")
-    print(f"Verify Email status: {verify_resp.status_code}, response: {verify_resp.json()}")
-    assert verify_resp.status_code == 200, f"Email verification failed: {verify_resp.text}"
-    assert verify_resp.json()["email"] == test_email
-    print("PASS: Email verified successfully.")
+        user = db.query(UserRecord).filter(UserRecord.id == user_id).one()
+        user.is_approved = True
+        db.commit()
+    print("PASS: Pending login blocked; account approved for remaining tests.")
 
     # 4. Test Login Endpoint
     print("\n[TEST 4] Testing User Login (/api/v1/auth/login)...")

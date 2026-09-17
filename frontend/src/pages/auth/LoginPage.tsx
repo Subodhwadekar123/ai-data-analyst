@@ -92,18 +92,6 @@ const LoginPage: React.FC = () => {
       const msg = err.message || 'Login failed. Please verify your credentials.';
       setError(msg);
 
-      // Unverified account: backend emailed a fresh OTP — log out any stale
-      // session and land directly on the OTP verification page with the
-      // challenge pre-loaded.
-      if (err.otp_required && err.challenge_id) {
-        logout();
-        toast.success('Verification code sent! Check your email.', { duration: 4000 });
-        navigate(`/verify-email?challenge=${encodeURIComponent(err.challenge_id)}&email=${encodeURIComponent(err.masked_email || email)}`);
-        return;
-      }
-      if (msg.toLowerCase().includes('verify your email')) {
-        setTimeout(() => navigate('/verify-email'), 2000);
-      }
     } finally {
       setLoading(false);
     }

@@ -6,7 +6,6 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useEffect, useState } from 'react';
-import { useStore } from './store/useStore';
 import { healthCheck } from './services/api';
 import SplashScreen from './components/ui/SplashScreen';
 import ErrorBoundary from './components/ui/ErrorBoundary';
@@ -20,7 +19,6 @@ import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
-import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 
 // ── User Portal Pages ──────────────────────────────────────────────────────
 import DashboardHome from './pages/DashboardHome';
@@ -96,7 +94,6 @@ function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/verify-email" element={<VerifyEmailPage />} />
 
         {/* ── Admin Routes ───────────────────────────────────────── */}
         <Route path="/admin/login" element={<AdminLoginPage />} />

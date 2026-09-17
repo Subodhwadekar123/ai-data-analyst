@@ -63,10 +63,8 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7              # Standard refresh
     REMEMBER_ME_EXPIRE_DAYS: int = 30               # Extended refresh
 
-    # ── Email Verification & Password Reset ───────────────────────────────────
-    EMAIL_VERIFICATION_EXPIRE_HOURS: int = 24
+    # ── Password Reset ───────────────────────────────────
     PASSWORD_RESET_EXPIRE_HOURS: int = 1
-    AUTO_VERIFY_USERS: bool = True                  # Auto-verify in local dev when no SMTP is configured
 
     # ── Account Security Policies ─────────────────────────────────────────────
     ENABLE_ACCOUNT_LOCKOUT: bool = False            # Disable lockout timers / restrictions
@@ -87,12 +85,6 @@ class Settings(BaseSettings):
     SMTP_USE_TLS: bool = False                      # True for production SMTP
     SMTP_USE_SSL: bool = False
 
-    # ── OTP (Email Verification Code) Configuration ──────────────────────────
-    OTP_ENABLED: bool = True                        # Require email OTP at registration
-    OTP_CODE_LENGTH: int = 6                        # Digits in the code
-    OTP_EXPIRE_MINUTES: int = 10                    # Code validity window
-    OTP_MAX_ATTEMPTS: int = 5                       # Wrong-code attempts before challenge locks
-    OTP_RESEND_COOLDOWN_SECONDS: int = 60           # Minimum gap between resends
 
     # ── Performance ───────────────────────────────────────────────────────────
     MAX_ROWS_FOR_ML: int = 500000

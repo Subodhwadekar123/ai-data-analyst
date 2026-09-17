@@ -4,6 +4,8 @@
  * All routes under /admin/* are wrapped here.
  */
 
+import { usePendingApprovalCount } from '../../hooks/usePendingApprovalCount';
+
 import React, { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -11,7 +13,7 @@ import toast from 'react-hot-toast';
 import {
   LayoutDashboard, Users, Activity, FileText,
   Shield, LogOut, ChevronLeft, ChevronRight,
-  Monitor, BarChart3, ArrowLeft, Database, Sparkles, Menu, X
+  Monitor, BarChart3, ArrowLeft, Database, Menu, X
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useIsMobile } from '../../hooks/useMediaQuery';
@@ -27,6 +29,7 @@ const NAV_ITEMS = [
 ];
 
 const AdminLayout: React.FC = () => {
+  const pendingCount = usePendingApprovalCount();
   const { user, logout } = useStore();
   const location = useLocation();
   const navigate = useNavigate();
@@ -221,7 +224,14 @@ const AdminLayout: React.FC = () => {
                   }
                 }}
               >
-                {item.icon}
+                <span style={{ position: 'relative', display: 'inline-flex' }}>
+                  {item.icon}
+                  {item.path === '/admin/users' && pendingCount !== null && pendingCount > 0 && (
+                    <span aria-label={`${pendingCount} users awaiting approval`} style={{ position: 'absolute',
+                      top: -10, right: -12, background: '#f97316', color: 'white', borderRadius: 999,
+                      padding: '1px 5px', fontSize: 10, fontWeight: 800 }}>{pendingCount}</span>
+                  )}
+                </span>
                 {!collapsed && (
                   <span style={{ fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap' }}>
                     {item.label}

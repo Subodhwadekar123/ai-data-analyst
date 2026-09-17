@@ -2,7 +2,7 @@
 AI Data Analyst - Authentication Service
 ==========================================
 Core business logic for all authentication operations.
-Handles: registration, login, logout, token refresh, email verification,
+Handles: registration, login, logout, token refresh, admin approval,
 password reset, session management, and account security.
 """
 
@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import (
     UserRecord, SessionRecord, RefreshTokenRecord,
-    EmailVerificationToken, PasswordResetToken, LoginHistory
+    PasswordResetToken, LoginHistory
 )
 from app.services.security import (
     hash_password, verify_password, create_access_token,
@@ -29,11 +29,8 @@ from app.services.audit_service import (
     AuditAction, AuditSeverity
 )
 from app.services.email_service import (
-    send_verification_email_bg, send_password_reset_bg,
+    send_password_reset_bg,
     send_password_changed_bg, send_new_device_login_bg, send_account_locked_bg,
-)
-from app.services.otp_service import (
-    create_otp_challenge, verify_otp_code, get_challenge, check_resend_allowed,
 )
 from app.utils.device_parser import parse_user_agent
 from app.utils.logger import setup_logger
@@ -53,7 +50,7 @@ def register_user(
 ) -> UserRecord:
     """
     Register a new user account.
-    Sends email verification. Account is inactive until email is verified.
+    New accounts require administrator approval before accessing the application.
     """
     # Email uniqueness check — soft-deleted accounts do not reserve their email.
     # The DB has a hard UNIQUE constraint on users.email, so when the only row
@@ -99,205 +96,24 @@ def register_user(
         )
 
     # Create user
-    # Admin email skips OTP; all other emails require OTP verification
-    _is_admin_email = email.lower().strip() == "admin@infinitics.ai"
-    auto_verify = _is_admin_email or getattr(settings, "AUTO_VERIFY_USERS", False)
     user = UserRecord(
         id=str(uuid.uuid4()),
         email=email.lower().strip(),
         username=username,
         full_name=full_name,
         hashed_password=hash_password(password),
-        role="admin" if _is_admin_email else "user",
-        is_admin=_is_admin_email,
+        role="user",
+        is_admin=False,
         is_active=True,
-        is_verified=auto_verify,
+        is_approved=False,
     )
     db.add(user)
     db.commit()
     db.refresh(user)
 
-    # Generate verification token & attempt email send
-    # When OTP verification is enabled, the 6-digit code email is sent by the
-    # router (via send_registration_otp) instead of the magic-link email.
-    verification_url = None
-    if not getattr(settings, "OTP_ENABLED", False):
-        verification_url = _send_verification_email(db, user, ip_address)
-
     log_event(db, AuditAction.REGISTER, user_id=user.id, user_email=user.email,
-              ip_address=ip_address, description="New user registration" + (" (auto-verified)" if auto_verify else ""))
-
-    logger.info(f"[SUCCESS] Registered user: {user.email} (verified={user.is_verified})")
-    return user, verification_url
-
-
-# ── Email Verification ────────────────────────────────────────────────────────
-
-def _send_verification_email(db: Session, user: UserRecord, ip_address: str = "Unknown") -> str:
-    """Create a verification token and send the email."""
-    # Invalidate old tokens
-    db.query(EmailVerificationToken).filter(
-        EmailVerificationToken.user_id == user.id,
-        EmailVerificationToken.is_used == False
-    ).update({"is_used": True})
-    db.commit()
-
-    token = generate_secure_token(32)
-    evt = EmailVerificationToken(
-        id=str(uuid.uuid4()),
-        user_id=user.id,
-        token=token,
-        expires_at=datetime.utcnow() + timedelta(hours=settings.EMAIL_VERIFICATION_EXPIRE_HOURS),
-    )
-    db.add(evt)
-    db.commit()
-
-    verification_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
-    send_verification_email_bg(user.email, user.full_name or user.email, verification_url)
-    return verification_url
-
-
-# ── Registration OTP (6-digit email code verification) ────────────────────────
-
-async def send_registration_otp(db: Session, user: UserRecord) -> Tuple[str, str, datetime]:
-    """
-    Create an OTP challenge for a freshly registered user and email the code.
-
-    The email send is handled by the caller (router) via FastAPI BackgroundTasks
-    so delivery is guaranteed while the response stays fast.
-    Returns (challenge_id, plain_code, expires_at).
-    """
-    challenge_id, code, expires_at = create_otp_challenge(db, user.id, purpose="registration")
-
-    log_event(db, AuditAction.EMAIL_VERIFICATION_SENT, user_id=user.id, user_email=user.email,
-              description="Registration OTP challenge created (email queued via BackgroundTasks)")
-    return challenge_id, code, expires_at
-
-
-async def resend_registration_otp(db: Session, challenge_id: str) -> Tuple[str, str, datetime, str, str]:
-    """
-    Resend the registration OTP for an existing challenge (cooldown-limited).
-
-    Returns (new_challenge_id, plain_code, expires_at, user_email, user_full_name).
-    The caller (router) dispatches the email via FastAPI BackgroundTasks.
-    """
-    challenge = get_challenge(db, challenge_id)
-    try:
-        check_resend_allowed(challenge)
-    except ValueError as e:
-        # pyrefly: ignore [missing-import]
-        from fastapi import HTTPException
-        raise HTTPException(status_code=429, detail=str(e))
-
-    user = challenge.user
-    new_challenge_id, _code, expires_at = create_otp_challenge(db, user.id, purpose=challenge.purpose)
-
-    log_event(db, AuditAction.RESEND_VERIFICATION, user_id=user.id, user_email=user.email,
-              description="Registration OTP challenge re-created (email queued via BackgroundTasks)")
-    return new_challenge_id, _code, expires_at, user.email, user.full_name or user.email
-
-
-async def resend_otp_to_unverified(db: Session, email: str) -> Optional[Tuple[str, str, datetime]]:
-    """
-    Create and email a fresh registration OTP for an EXISTING unverified account.
-
-    Makes registration retry-safe: if a previous register request's response was
-    lost (e.g. backend cold-start timeout) the account exists but the user never
-    saw the OTP page. Re-submitting the same email now resends a code instead of
-    failing with "email already exists".
-
-    The caller dispatches the email via BackgroundTasks.
-    Returns (challenge_id, plain_code, expires_at) when the email
-    belongs to an unverified, non-deleted account, else None.
-    """
-    user = db.query(UserRecord).filter(
-        UserRecord.email == email.lower().strip(),
-        UserRecord.is_deleted == False,  # noqa: E712
-    ).first()
-    if not user or user.is_verified:
-        return None
-
-    challenge_id, code, expires_at = create_otp_challenge(db, user.id, purpose="registration")
-    log_event(db, AuditAction.RESEND_VERIFICATION, user_id=user.id, user_email=user.email,
-              description="Registration OTP re-created for existing unverified account (email queued via BackgroundTasks)")
-    return challenge_id, code, expires_at
-
-
-def verify_registration_otp(
-    db: Session,
-    challenge_id: str,
-    code: str,
-    user_agent: str = "",
-    ip_address: str = "Unknown",
-) -> Tuple[str, str, str, UserRecord]:
-    """
-    Verify the registration OTP code: mark the user's email as verified,
-    then auto-login (create session + tokens) so the user lands in the app.
-
-    Returns (access_token, refresh_token, session_id, user).
-    Raises ValueError with a user-safe message on invalid/expired/wrong codes.
-    """
-    challenge = verify_otp_code(db, challenge_id, code)
-    user = challenge.user
-
-    was_verified = user.is_verified
-    user.is_verified = True
-    db.commit()
-    db.refresh(user)
-
-    if not was_verified:
-        log_event(db, AuditAction.EMAIL_VERIFIED, user_id=user.id, user_email=user.email,
-                  ip_address=ip_address, description="Email verified via OTP code")
-
-    logger.info(f"[SUCCESS] Email verified via OTP for user: {user.email}")
-
-    return issue_session_for_user(
-        db=db,
-        user=user,
-        user_agent=user_agent,
-        ip_address=ip_address,
-        remember_me=True,  # fresh registrations get a long-lived session
-    )
-
-
-def verify_email_token(db: Session, token: str) -> UserRecord:
-    """Verify email using the token from the email link."""
-    evt = db.query(EmailVerificationToken).filter(
-        EmailVerificationToken.token == token,
-        EmailVerificationToken.is_used == False
-    ).first()
-
-    # pyrefly: ignore [missing-import]
-    from fastapi import HTTPException, status
-
-    if not evt:
-        raise HTTPException(status_code=400, detail="Invalid or already used verification link.")
-
-    if datetime.utcnow() > evt.expires_at:
-        raise HTTPException(status_code=400, detail="This verification link has expired. Please request a new one.")
-
-    # Mark token used
-    evt.is_used = True
-    # Verify user
-    user = evt.user
-    user.is_verified = True
-    db.commit()
-    db.refresh(user)
-
-    log_event(db, AuditAction.EMAIL_VERIFIED, user_id=user.id, user_email=user.email,
-              description="Email address verified successfully")
+              ip_address=ip_address, description="New registration awaiting admin approval")
     return user
-
-
-def resend_verification_email(db: Session, email: str, ip_address: str = "Unknown") -> Optional[str]:
-    """Resend email verification link."""
-    user = db.query(UserRecord).filter(UserRecord.email == email.lower()).first()
-    verification_url = None
-    if user and not user.is_verified and not user.is_deleted:
-        verification_url = _send_verification_email(db, user, ip_address)
-        log_event(db, AuditAction.RESEND_VERIFICATION, user_id=user.id, user_email=user.email,
-                  ip_address=ip_address)
-    return verification_url
 
 
 # ── Login ─────────────────────────────────────────────────────────────────────
@@ -366,11 +182,11 @@ def login_user(
         _handle_failed_attempt(db, user, ip_address, device_info)
         raise auth_error
 
-    # Check email verification (admin@infinitics.ai skips OTP)
-    if not user.is_verified and email != "admin@infinitics.ai":
+    # Require administrator approval after validating credentials
+    if not user.is_approved:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Please verify your email address before logging in. Check your inbox.",
+            detail="Your account is awaiting admin approval. Please contact your administrator.",
         )
 
     # Check account active
@@ -401,13 +217,16 @@ def issue_session_for_user(
 ) -> Tuple[str, str, str, UserRecord]:
     """
     Create a full session (session record, refresh token, JWT access token)
-    for a user whose identity has already been verified (password or OTP).
+    for a password-authenticated, administrator-approved user.
 
-    Used by both login and post-registration OTP verification (auto-login).
 
     Returns:
         (access_token, refresh_token, session_id, user)
     """
+    from fastapi import HTTPException
+    if not user.is_approved or not user.is_active or user.is_deleted or user.is_suspended:
+        raise HTTPException(status_code=403, detail="Account is not approved or accessible.")
+
     device_info = device_info or parse_user_agent(user_agent)
 
     # Reset failed attempts on successful login
@@ -644,7 +463,7 @@ def refresh_access_token(
         raise HTTPException(status_code=401, detail="Session is no longer active.")
 
     user = rt.user
-    if not user or not user.is_active or user.is_deleted or user.is_suspended:
+    if not user or not user.is_approved or not user.is_active or user.is_deleted or user.is_suspended:
         raise HTTPException(status_code=401, detail="Account is not accessible.")
 
     # Rotate: revoke old, create new

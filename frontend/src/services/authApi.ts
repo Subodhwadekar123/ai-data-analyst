@@ -44,12 +44,8 @@ authApi.interceptors.response.use(
     const isPublicAuthRoute =
       requestUrl.includes('/auth/login') ||
       requestUrl.includes('/auth/register') ||
-      requestUrl.includes('/auth/verify-otp') ||
-      requestUrl.includes('/auth/resend-otp') ||
       requestUrl.includes('/auth/forgot-password') ||
       requestUrl.includes('/auth/reset-password') ||
-      requestUrl.includes('/auth/verify-email') ||
-      requestUrl.includes('/auth/resend-verification') ||
       requestUrl.includes('/auth/refresh');
 
     if (error.response?.status === 401 && !originalRequest?._retry && !isPublicAuthRoute) {
@@ -98,9 +94,6 @@ authApi.interceptors.response.use(
       }
     }
 
-    // Structured detail (e.g. unverified-login 403 returns an object with
-    // otp_required / challenge_id / masked_email) — surface the message and
-    // propagate the fields so pages can react (e.g. land on the OTP page).
     const detail = error.response?.data?.detail;
     let message = typeof detail === 'string' ? detail : (detail?.message as string | undefined);
 
@@ -114,13 +107,7 @@ authApi.interceptors.response.use(
       }
     }
 
-    const wrapped = new Error(message) as Error & { otp_required?: boolean; challenge_id?: string; masked_email?: string };
-    if (detail && typeof detail === 'object') {
-      wrapped.otp_required = !!detail.otp_required;
-      wrapped.challenge_id = detail.challenge_id;
-      wrapped.masked_email = detail.masked_email;
-    }
-    return Promise.reject(wrapped);
+    return Promise.reject(new Error(message));
   }
 );
 
@@ -153,7 +140,7 @@ export interface LoginResponse {
     role: string;
     is_admin: boolean;
     is_active: boolean;
-    is_verified: boolean;
+    is_approved: boolean;
     last_login?: string;
     created_at: string;
     login_count: number;
@@ -162,12 +149,6 @@ export interface LoginResponse {
 
 export const registerUser = (payload: RegisterPayload): Promise<any> =>
   authApi.post('/auth/register', payload) as Promise<any>;
-
-export const verifyOtp = (challengeId: string, code: string): Promise<any> =>
-  authApi.post('/auth/verify-otp', { challenge_id: challengeId, code }) as Promise<any>;
-
-export const resendOtp = (challengeId: string): Promise<any> =>
-  authApi.post('/auth/resend-otp', { challenge_id: challengeId }) as Promise<any>;
 
 export const loginUser = (payload: LoginPayload): Promise<LoginResponse> =>
   authApi.post('/auth/login', payload) as Promise<LoginResponse>;
@@ -180,12 +161,6 @@ export const logoutAllDevices = (): Promise<any> =>
 
 export const refreshToken = (): Promise<any> =>
   authApi.post('/auth/refresh') as Promise<any>;
-
-export const verifyEmail = (token: string): Promise<any> =>
-  authApi.post('/auth/verify-email', { token }) as Promise<any>;
-
-export const resendVerification = (email: string): Promise<any> =>
-  authApi.post('/auth/resend-verification', { email }) as Promise<any>;
 
 export const forgotPassword = (email: string): Promise<any> =>
   authApi.post('/auth/forgot-password', { email }) as Promise<any>;

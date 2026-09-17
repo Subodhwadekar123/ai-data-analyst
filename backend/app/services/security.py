@@ -138,11 +138,6 @@ def generate_secure_token(length: int = 32) -> str:
     return secrets.token_urlsafe(length)
 
 
-def generate_numeric_code(digits: int = 6) -> str:
-    """Generate a random numeric OTP code."""
-    return str(secrets.randbelow(10 ** digits)).zfill(digits)
-
-
 # ── Password Strength Validation ──────────────────────────────────────────────
 
 def validate_password_strength(password: str) -> tuple[bool, list[str]]:

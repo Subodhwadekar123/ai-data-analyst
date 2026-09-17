@@ -113,7 +113,7 @@ export const HomeAuthPortal: React.FC<HomeAuthPortalProps> = ({ onSuccess }) => 
       role: 'user',
       is_admin: false,
       is_active: true,
-      is_verified: true,
+      is_approved: true,
       created_at: new Date().toISOString(),
       login_count: 1,
     };

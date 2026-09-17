@@ -156,7 +156,7 @@ const ProfilePage: React.FC = () => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
               <InfoRow icon={<Mail size={15} />} label="Email" value={user?.email || ''} />
               <InfoRow icon={<Shield size={15} />} label="Role" value={user?.role || 'user'} chip chipColor={user?.is_admin ? '#4f46e5' : '#0891b2'} />
-              <InfoRow icon={<CheckCircle size={15} />} label="Email Status" value={user?.is_verified ? 'Verified' : 'Unverified'} chip chipColor={user?.is_verified ? '#059669' : '#dc2626'} />
+              <InfoRow icon={<CheckCircle size={15} />} label="Approval Status" value={user?.is_approved ? 'Approved' : 'Pending Approval'} chip chipColor={user?.is_approved ? '#059669' : '#dc2626'} />
               <InfoRow icon={<Clock size={15} />} label="Member Since" value={user?.created_at ? new Date(user.created_at).toLocaleDateString() : '-'} />
             </div>
             <button onClick={handleSaveProfile} disabled={savingProfile}

@@ -20,11 +20,11 @@
   * Active sessions viewer with one-click remote device revocation.
   * Complete login audit history (timestamp, IP, user-agent, status).
   * In-app password change with real-time strength meter.
-  * Email verification support with automatic local fallback for rapid development.
+  * Administrator approval workflow: new registrations stay pending until approved in the admin console.
 
 ### 🛡️ 2. Comprehensive Admin Control Center (`/admin`)
 * **Real-time Overview Metrics**: Total users, active datasets, machine learning experiments, and reported platform issues.
-* **User Management**: Search, filter, inspect details, reset passwords, suspend, or activate user accounts.
+* **User Management**: Search, filter, inspect details, reset passwords, suspend, or activate user accounts. Includes a **Pending Approvals** popup (with a live count badge on the Users sidebar item) to approve new registrations.
 * **Global Activity & Security Logs**: Comprehensive tracking of login events and audit actions.
 * **Direct Studio Navigation**: Seamless 1-click toggle between Admin Console and the Data Analysis Studio (`/dashboard`).
 
@@ -51,6 +51,20 @@
 ### 💡 7. Gemini-Powered AI Insights & Assistant
 * **Executive Summary**: Instant AI narrative summarizing key findings and actionable business recommendations.
 * **Interactive AI Chat Sidebar**: Natural language queries directly over uploaded datasets.
+
+---
+
+## 🆕 Recent Changes — Admin Approval Replaces OTP
+
+* **OTP email verification removed** across the entire stack (endpoints, service, models, templates, UI pages, and settings).
+* **Admin approval workflow added**:
+  * New registrations are created **pending** and receive **no session tokens** until approved.
+  * Login, `/auth/me`, and token refresh are **blocked with 403** for unapproved accounts.
+  * Admins approve users via **User Management → Pending Approvals** popup; the **Users sidebar item shows an orange count badge** of users waiting for approval (auto-refreshes every 30s and after approvals).
+  * Every approval is recorded in the **audit log** (`ADMIN_APPROVE_USER`).
+* **Approval is independent of suspension**: approving an account never un-suspends or reactivates it.
+* **Safe migration**: existing verified users and admins keep access; other accounts join the approval queue automatically.
+* Public registration can no longer grant admin privileges.
 
 ---
 

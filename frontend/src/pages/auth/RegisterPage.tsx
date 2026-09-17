@@ -4,28 +4,24 @@
  *  - Full Name, Username (optional), Email, Password, Confirm Password
  *  - Password strength meter
  *  - Terms & Conditions checkbox
- *  - Post-registration "check your email" screen
+ *  - Post-registration pending approval screen
  */
 
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import toast from 'react-hot-toast';
 import {
   User, Mail, Lock, Eye, EyeOff, Shield,
   Loader2, AlertCircle, CheckCircle, ArrowRight, UserPlus, ArrowLeft
 } from 'lucide-react';
-import { registerUser, resendVerification, verifyOtp, resendOtp } from '../../services/authApi';
+import { registerUser } from '../../services/authApi';
 import PasswordStrengthMeter from '../../components/auth/PasswordStrengthMeter';
 import { useIsMobile } from '../../hooks/useMediaQuery';
-import { useStore } from '../../store/useStore';
-import type { AuthUser } from '../../store/useStore';
 import InteractiveBackground from '../../components/layout/InteractiveBackground';
 
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const { setUser, setToken, setSessionId } = useStore();
   const [formData, setFormData] = useState({
     full_name: '',
     username: '',
@@ -39,19 +35,6 @@ const RegisterPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [registered, setRegistered] = useState(false);
-  const [isVerified, setIsVerified] = useState(false);
-  const [verificationUrl, setVerificationUrl] = useState('');
-
-  // ── OTP verification state ────────────────────────────────────────────────
-  const [challengeId, setChallengeId] = useState('');
-  const [maskedEmail, setMaskedEmail] = useState('');
-  const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
-  const otpInputsRef = React.useRef<Array<HTMLInputElement | null>>([]);
-  const [otpLoading, setOtpLoading] = useState(false);
-  const [otpError, setOtpError] = useState('');
-  const [resendCooldown, setResendCooldown] = useState(0);
-  const [emailSendFailed, setEmailSendFailed] = useState(false);
-
   const update = (field: string, value: string | boolean) =>
     setFormData((p) => ({ ...p, [field]: value }));
 
@@ -74,30 +57,14 @@ const RegisterPage: React.FC = () => {
 
     setLoading(true);
     try {
-      const res = await registerUser({
+      await registerUser({
         email: formData.email,
         password: formData.password,
         full_name: formData.full_name,
         username: formData.username || undefined,
         agree_terms: true,
       });
-      if (res?.is_verified) {
-        setIsVerified(true);
-      }
-      if (res?.verification_url) {
-        setVerificationUrl(res.verification_url);
-      }
-      // OTP flow: stash challenge id and show the OTP entry step
-      if (res?.otp_required && res?.challenge_id) {
-        setChallengeId(res.challenge_id);
-        setMaskedEmail(res.masked_email || formData.email);
-        setEmailSendFailed(res.email_sent === false);
-        setRegistered(true);
-        setTimeout(() => otpInputsRef.current?.[0]?.focus(), 250);
-        startResendCooldown(30);
-      } else {
-        setRegistered(true);
-      }
+      setRegistered(true);
     } catch (err: any) {
       setError(err.message || 'Registration failed. Please try again.');
     } finally {
@@ -105,281 +72,20 @@ const RegisterPage: React.FC = () => {
     }
   };
 
-  // ── OTP Handlers ─────────────────────────────────────────────────────────────
-
-  const startResendCooldown = (seconds: number) => {
-    setResendCooldown(seconds);
-  };
-
-  // Decrement resend cooldown every second
-  React.useEffect(() => {
-    if (resendCooldown <= 0) return;
-    const t = setTimeout(() => setResendCooldown((s) => s - 1), 1000);
-    return () => clearTimeout(t);
-  }, [resendCooldown]);
-
-  const completeOtp = (digits: string[]) => digits.every((d) => d !== '');
-
-  const handleOtpChange = (index: number, value: string) => {
-    // Only digits
-    const clean = value.replace(/[^0-9]/g, '');
-    if (!clean) {
-      const next = [...otpDigits];
-      next[index] = '';
-      setOtpDigits(next);
-      return;
-    }
-    // Distribute paste / multi-char input across remaining boxes
-    const chars = clean.split('').slice(0, 6 - index);
-    const next = [...otpDigits];
-    let i = 0;
-    for (; i < chars.length; i++) next[index + i] = chars[i];
-    setOtpDigits(next);
-    // Focus the next empty box (or last filled)
-    const target = Math.min(index + chars.length, 5);
-    otpInputsRef.current?.[target]?.focus();
-    setOtpError('');
-  };
-
-  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace') {
-      if (otpDigits[index] === '' && index > 0) {
-        const next = [...otpDigits];
-        next[index - 1] = '';
-        setOtpDigits(next);
-        otpInputsRef.current?.[index - 1]?.focus();
-      }
-    }
-  };
-
-  const handleOtpPaste = (e: React.ClipboardEvent) => {
-    const text = e.clipboardData.getData('text').replace(/[^0-9]/g, '').slice(0, 6);
-    if (!text) return;
-    e.preventDefault();
-    const next = ['', '', '', '', '', ''];
-    for (let i = 0; i < text.length; i++) next[i] = text[i];
-    setOtpDigits(next);
-    otpInputsRef.current?.[Math.min(text.length, 5)]?.focus();
-    setOtpError('');
-  };
-
-  const handleOtpVerify = async () => {
-    const code = otpDigits.join('');
-    if (code.length < 6) {
-      setOtpError('Please enter the complete 6-digit code.');
-      return;
-    }
-    setOtpLoading(true);
-    setOtpError('');
-    try {
-      const res = await verifyOtp(challengeId, code);
-      // Auto-login: store tokens + user, then go to dashboard
-      if (res?.access_token) {
-        setToken(res.access_token);
-        setSessionId(res.session_id);
-        setUser(res.user as AuthUser);
-      }
-      toast.success(res?.message || 'Email verified! Welcome to AI Data Analyst.');
-      if (res?.user?.is_admin || res?.user?.role === 'admin') {
-        navigate('/admin/dashboard');
-      } else {
-        navigate('/dashboard');
-      }
-    } catch (err: any) {
-      const msg = err.message || 'Verification failed. Please try again.';
-      setOtpError(msg);
-      setOtpDigits(['', '', '', '', '', '']);
-      otpInputsRef.current?.[0]?.focus();
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
-  const handleOtpResend = async () => {
-    if (resendCooldown > 0 || otpLoading) return;
-    try {
-      const res = await resendOtp(challengeId);
-      if (res?.challenge_id) {
-        setChallengeId(res.challenge_id);
-      }
-      setEmailSendFailed(res?.email_sent === false);
-      toast.success(res?.message || 'A new verification code has been sent to your email.');
-      if (res?.email_sent === false) {
-        toast.error('Email delivery failed — check backend SMTP settings.');
-      }
-      setOtpError('');
-      startResendCooldown(30);
-      otpInputsRef.current?.[0]?.focus();
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to resend the code.');
-    }
-  };
-
-  const handleBackToForm = () => {
-    setRegistered(false);
-    setError('');
-    setOtpError('');
-  };
-
   if (registered) {
-    // ── OTP verification step ────────────────────────────────────────────────
-    if (challengeId) {
-      return (
-        <div style={pageStyle}>
-          <InteractiveBackground />
-          <div style={blobStyle1} /><div style={blobStyle2} />
-          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="glow-card"
-            style={{ padding: isMobile ? '24px 18px' : '32px', position: 'relative', zIndex: 1, textAlign: 'center', maxWidth: '440px', width: '100%', boxSizing: 'border-box' }}>
-            <div style={{ width: '72px', height: '72px', background: 'var(--accent-primary-light)', border: '2px solid var(--border-default)', borderRadius: '50%', margin: '0 auto 20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Mail size={34} color="var(--accent-primary)" />
-            </div>
-            <h2 style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '8px' }}>Enter Verification Code</h2>
-            <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '6px', fontSize: '14px' }}>
-              We emailed a 6-digit code to <strong style={{ color: 'var(--accent-primary)' }}>{maskedEmail}</strong>. Enter it below to activate your account.
-            </p>
-            <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginBottom: '22px' }}>
-              Code expires in 10 minutes. Can't find it? Check your spam/junk folder.
-            </p>
-
-            {emailSendFailed && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.35)', borderRadius: '8px',
-                padding: '8px 12px', marginBottom: '14px', fontSize: '13px', color: '#fb923c' }}>
-                <AlertCircle size={14} /><span>Email delivery failed. Please wait a moment and use "Resend code".</span>
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '18px' }}>
-              {otpDigits.map((d, i) => (
-                <input key={i} ref={(el) => { otpInputsRef.current[i] = el; }} value={d} inputMode="numeric"
-                  autoComplete={i === 0 ? 'one-time-code' : 'off'} maxLength={6} disabled={otpLoading}
-                  onChange={(e) => handleOtpChange(i, e.target.value)}
-                  onKeyDown={(e) => handleOtpKeyDown(i, e)} onPaste={handleOtpPaste}
-                  style={{ width: isMobile ? 40 : 44, height: isMobile ? 48 : 52, textAlign: 'center', fontSize: '20px', fontWeight: 700,
-                    fontFamily: 'var(--font-family-mono)', background: 'var(--bg-canvas)',
-                    border: `1.5px solid ${d ? 'var(--accent-primary)' : 'var(--border-default)'}`, borderRadius: '10px',
-                    color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.15s' }}
-                />
-              ))}
-            </div>
-
-            {otpError && (
-              <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                  background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px',
-                  padding: '8px 12px', marginBottom: '16px', fontSize: '13px', color: '#f87171' }}>
-                <AlertCircle size={14} /><span>{otpError}</span>
-              </motion.div>
-            )}
-
-            <motion.button whileHover={{ scale: otpLoading ? 1 : 1.01 }} whileTap={{ scale: otpLoading ? 1 : 0.98 }}
-              onClick={handleOtpVerify} disabled={otpLoading}
-              style={{ width: '100%', padding: '13px', background: otpLoading ? 'rgba(99,102,241,0.5)' : 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-                color: 'white', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700,
-                cursor: otpLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                boxShadow: otpLoading ? 'none' : '0 4px 20px rgba(99,102,241,0.4)' }}>
-              {otpLoading ? <><Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />Verifying...</> : <>Verify & Activate Account <ArrowRight size={16} /></>}
-            </motion.button>
-
-            <div style={{ marginTop: '16px', fontSize: '13px' }}>
-              {resendCooldown > 0 ? <span style={{ color: 'var(--text-muted)' }}>Resend code in {resendCooldown}s</span>
-                : <><span style={{ color: 'var(--text-muted)' }}>Didn't receive it? </span>
-                  <button onClick={handleOtpResend} disabled={otpLoading}
-                    style={{ background: 'none', border: 'none', color: '#6366f1', fontSize: '13px', cursor: 'pointer', textDecoration: 'underline', fontWeight: 600 }}>Resend code</button>
-                </>}
-            </div>
-
-            <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border-subtle)' }}>
-              <button onClick={handleBackToForm} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                <ArrowLeft size={13} /> Back to registration form
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      );
-    }
-
-    // ── Legacy success screen (auto-verified / link-based flow) ─────────────
     return (
       <div style={pageStyle}>
         <InteractiveBackground />
-        <div style={blobStyle1} /><div style={blobStyle2} />
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="glow-card"
-          style={{ padding: '32px', position: 'relative', zIndex: 1, textAlign: 'center', maxWidth: '440px', width: '100%', boxSizing: 'border-box' }}
-        >
-          <div style={{ width: '72px', height: '72px', background: 'var(--accent-primary-light)', border: '2px solid var(--border-default)', borderRadius: '50%', margin: '0 auto 20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <CheckCircle size={36} color="#10b981" />
-          </div>
-          <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#f1f5f9', marginBottom: '12px' }}>
-            {isVerified ? '🎉 Account Activated!' : 'Account Created!'}
-          </h2>
-          <p style={{ color: '#94a3b8', lineHeight: 1.6, marginBottom: '16px', fontSize: '14px' }}>
-            {isVerified
-              ? <>Welcome <strong style={{ color: '#a5b4fc' }}>{formData.full_name || formData.email}</strong>! Your account is active and verified. You can log in right now.</>
-              : <>Verification link prepared for <strong style={{ color: '#a5b4fc' }}>{formData.email}</strong>.</>
-            }
+        <div className="glow-card" style={{ padding: isMobile ? '24px 18px' : '32px', maxWidth: 440, textAlign: 'center', zIndex: 1 }}>
+          <CheckCircle size={40} color="var(--accent-primary)" />
+          <h2 style={{ color: 'var(--text-primary)' }}>Awaiting Admin Approval</h2>
+          <p style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+            Your account has been created. An administrator must approve your account before you can sign in.
+            Please contact your administrator if you need help.
           </p>
-
-          {!isVerified && verificationUrl && (
-            <div style={{ margin: '16px 0 20px', padding: '16px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '12px', textAlign: 'center' }}>
-              <p style={{ fontSize: '12px', fontWeight: 700, color: '#a5b4fc', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                ⚡ Instant Email Verification
-              </p>
-              <a
-                href={verificationUrl}
-                style={{
-                  display: 'inline-block',
-                  background: 'linear-gradient(135deg, #10b981, #059669)',
-                  color: 'white',
-                  textDecoration: 'none',
-                  borderRadius: '10px',
-                  padding: '10px 24px',
-                  fontSize: '14px',
-                  fontWeight: 700,
-                  boxShadow: '0 4px 12px rgba(16,185,129,0.35)'
-                }}
-              >
-                Verify & Activate Account Now →
-              </a>
-            </div>
-          )}
-
-          {!isVerified && (
-            <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '20px' }}>
-              Link expires in 24 hours. Once verified, you can sign in to your dashboard.
-            </p>
-          )}
-
-          <button
-            onClick={() => navigate('/login')}
-            style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', color: 'white', border: 'none', borderRadius: '10px', padding: '12px 28px', fontSize: '15px', fontWeight: 700, cursor: 'pointer', width: '100%', marginTop: isVerified ? '8px' : '0' }}
-          >
-            {isVerified ? 'Sign In to Your Account →' : 'Go to Login'}
-          </button>
-          {!isVerified && (
-            <div style={{ marginTop: '16px' }}>
-              <button
-                onClick={async () => {
-                  try {
-                    const res = await resendVerification(formData.email);
-                    if (res?.verification_url) {
-                      setVerificationUrl(res.verification_url);
-                    }
-                    toast.success('Verification link refreshed!');
-                  } catch (err: any) {
-                    toast.error(err.message || 'Failed to resend.');
-                  }
-                }}
-                style={{ background: 'none', border: 'none', color: '#6366f1', fontSize: '13px', cursor: 'pointer', textDecoration: 'underline' }}
-              >
-                Resend verification link
-              </button>
-            </div>
-          )}
-        </motion.div>
+          <button onClick={() => navigate('/login')} style={{ padding: '12px 24px', borderRadius: 10,
+            background: 'var(--accent-primary)', color: 'white', border: 0, cursor: 'pointer' }}>Go to Login</button>
+        </div>
       </div>
     );
   }

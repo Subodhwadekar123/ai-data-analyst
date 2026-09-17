@@ -14,8 +14,8 @@ import {
 import { getAdminStats, getLoginActivity } from '../../services/adminApi';
 
 interface Stats {
-  total_users: number; active_users: number; verified_users: number;
-  unverified_users: number; suspended_users: number; deleted_users: number;
+  total_users: number; active_users: number; approved_users: number;
+  pending_users: number; suspended_users: number; deleted_users: number;
   total_datasets: number; total_experiments: number; total_issues: number;
   active_sessions: number; failed_logins_24h: number;
 }
@@ -23,7 +23,7 @@ interface Stats {
 const STAT_CARDS = (stats: Stats) => [
   { label: 'Total Users', value: stats.total_users, icon: <Users size={22} />, color: '#6366f1', bg: 'rgba(99,102,241,0.12)', link: '/admin/users' },
   { label: 'Active Users', value: stats.active_users, icon: <UserCheck size={22} />, color: '#10b981', bg: 'rgba(16,185,129,0.12)', link: '/admin/users?is_active=true' },
-  { label: 'Unverified', value: stats.unverified_users, icon: <UserX size={22} />, color: '#f97316', bg: 'rgba(249,115,22,0.12)', link: '/admin/users?is_verified=false' },
+  { label: 'Pending Approval', value: stats.pending_users, icon: <UserX size={22} />, color: '#f97316', bg: 'rgba(249,115,22,0.12)', link: '/admin/users?is_approved=false' },
   { label: 'Suspended', value: stats.suspended_users, icon: <Shield size={22} />, color: '#ef4444', bg: 'rgba(239,68,68,0.12)', link: '/admin/users?is_suspended=true' },
   { label: 'Active Sessions', value: stats.active_sessions, icon: <Monitor size={22} />, color: '#06b6d4', bg: 'rgba(6,182,212,0.12)', link: '/admin/sessions' },
   { label: 'Failed Logins (24h)', value: stats.failed_logins_24h, icon: <AlertTriangle size={22} />, color: '#eab308', bg: 'rgba(234,179,8,0.12)', link: '/admin/activity?success=false' },

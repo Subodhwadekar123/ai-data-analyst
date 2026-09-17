@@ -8,7 +8,6 @@ Tables:
   - users              (extended with auth fields)
   - sessions           (active sessions per device)
   - refresh_tokens     (rotatable refresh tokens)
-  - email_verification_tokens
   - password_reset_tokens
   - login_history      (every login attempt)
   - audit_logs         (security audit trail)
@@ -77,7 +76,8 @@ class UserRecord(Base):
 
     # Account Status
     is_active = Column(Boolean, default=True)
-    is_verified = Column(Boolean, default=False)              # email verified
+    is_approved = Column(Boolean, default=False, nullable=False, server_default="false")
+    is_verified = Column(Boolean, default=False)              # legacy migration only
     is_suspended = Column(Boolean, default=False)
     is_deleted = Column(Boolean, default=False)               # soft delete
     suspension_reason = Column(Text, nullable=True)
@@ -101,7 +101,6 @@ class UserRecord(Base):
     # Relationships
     sessions = relationship("SessionRecord", back_populates="user", cascade="all, delete-orphan")
     refresh_tokens = relationship("RefreshTokenRecord", back_populates="user", cascade="all, delete-orphan")
-    email_tokens = relationship("EmailVerificationToken", back_populates="user", cascade="all, delete-orphan")
     reset_tokens = relationship("PasswordResetToken", back_populates="user", cascade="all, delete-orphan")
     login_history = relationship("LoginHistory", back_populates="user", cascade="all, delete-orphan")
     audit_logs = relationship("AuditLog", back_populates="user", cascade="all, delete-orphan")
@@ -165,21 +164,6 @@ class RefreshTokenRecord(Base):
     session = relationship("SessionRecord", back_populates="refresh_token")
 
 
-class EmailVerificationToken(Base):
-    """Time-limited tokens for email verification."""
-    __tablename__ = "email_verification_tokens"
-
-    id = Column(String, primary_key=True, index=True)
-    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    token = Column(String, unique=True, index=True, nullable=False)
-    is_used = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    expires_at = Column(DateTime, nullable=False)
-
-    # Relationship
-    user = relationship("UserRecord", back_populates="email_tokens")
-
-
 class PasswordResetToken(Base):
     """Single-use expiring tokens for password reset."""
     __tablename__ = "password_reset_tokens"
@@ -234,28 +218,6 @@ class LoginHistory(Base):
         Index("ix_login_history_user_time", "user_id", "login_time"),
         Index("ix_login_history_ip", "ip_address"),
     )
-
-
-class OTPChallenge(Base):
-    """Short-lived email OTP challenge (e.g., registration email verification)."""
-    __tablename__ = "otp_challenges"
-
-    id = Column(String, primary_key=True, index=True)
-    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    purpose = Column(String, default="registration", nullable=False)  # "registration" | "login"
-
-    # Security
-    code_hash = Column(String, nullable=False)       # SHA-256 hash of the OTP code
-    attempts = Column(Integer, default=0)            # Wrong-code attempts consumed
-    consumed = Column(Boolean, default=False)        # Set True after successful verify
-
-    # Timing
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
-    expires_at = Column(DateTime, nullable=False)
-    last_sent_at = Column(DateTime, default=datetime.utcnow)
-
-    # Relationship
-    user = relationship("UserRecord")
 
 
 class AuditLog(Base):
@@ -353,12 +315,20 @@ class IssueRecord(Base):
 # ── Database Initialization ──────────────────────────────────────────────────
 def _add_column_if_missing(conn, table: str, column: str, col_type: str):
     """Helper: Add a column to an existing table if it doesn't already exist."""
-    try:
-        from sqlalchemy import text
-        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type};"))
-        print(f"  [OK] Migrated: {table}.{column}")
-    except Exception:
-        pass   # Column already exists
+    from sqlalchemy import inspect, text
+    if column not in {c["name"] for c in inspect(conn).get_columns(table)}:
+        # PostgreSQL boolean defaults must be TRUE/FALSE, not integer literals.
+        col_type = col_type.replace("BOOLEAN DEFAULT 0", "BOOLEAN DEFAULT FALSE")
+        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
+
+
+def migrate_approval(conn):
+    """One-time backfill preserves existing access; never re-approves pending users."""
+    from sqlalchemy import inspect, text
+    columns = {c["name"] for c in inspect(conn).get_columns("users")}
+    if "is_approved" not in columns:
+        conn.execute(text("ALTER TABLE users ADD COLUMN is_approved BOOLEAN NOT NULL DEFAULT FALSE"))
+        conn.execute(text("UPDATE users SET is_approved = TRUE WHERE is_verified = TRUE OR is_admin = TRUE OR role = 'admin'"))
 
 
 def _ensure_user_columns(engine):
@@ -441,6 +411,9 @@ def init_db() -> None:
         for table, col, col_type in migrations:
             _add_column_if_missing(conn, table, col, col_type)
 
+    with engine.begin() as conn:
+        migrate_approval(conn)
+
     # Robust repair: ensure every column the model expects actually exists
     # (fixes the "column users.username does not exist" 500 on pre-existing DBs).
     _ensure_user_columns(engine)
@@ -466,7 +439,7 @@ def init_db() -> None:
                 username="admin_subodh",
                 is_active=True,
                 is_admin=True,
-                is_verified=True,
+                is_approved=True,
                 role="admin",
             )
             db.add(admin_user)
@@ -475,7 +448,7 @@ def init_db() -> None:
             admin_exists.hashed_password = hashed_admin_pass
             admin_exists.full_name = "System Admin Subodh"
             admin_exists.is_admin = True
-            admin_exists.is_verified = True
+            admin_exists.is_approved = True
             admin_exists.role = "admin"
             print("[OK] Updated admin credentials: admin@infinitics.ai")
 
